@@ -1,48 +1,68 @@
-# taskpay
+# TaskPay
 
-A new Celo blockchain project
+MiniPay micro-task marketplace on Celo. Post real-world verification tasks with **COPm** rewards locked in escrow. Takers submit photo evidence; posters approve and pay.
 
-A modern Celo blockchain application built with Next.js, TypeScript, and Turborepo.
+Built for [Agentes Onchain Colombia](https://hackathon.celocolombia.org/) — Demo Day June 19, 2026.
 
-## Getting Started
+## Features
 
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
+- **COPm escrow** — rewards held in `TaskPay.sol` until approval
+- **USDm fee abstraction** — gas paid in USDm via MiniPay
+- **Auto-connect** — no Connect Wallet button inside MiniPay
+- **Photo evidence** — Supabase storage, URL stored onchain
+- **Mobile-first** — single column, bottom nav, English UI
 
-2. Start the development server:
-   ```bash
-   pnpm dev
-   ```
+## Stack
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+- Next.js 14 (App Router) + Tailwind
+- wagmi v2 + viem
+- Foundry (TaskPay.sol)
+- Supabase (evidence photos only)
 
-## Project Structure
+## Quick start
 
-This is a monorepo managed by Turborepo with the following structure:
+```bash
+pnpm install
+cp .env.example apps/web/.env.local
+# Set NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA after deploy
 
-- `apps/web` - Next.js application with embedded UI components and utilities
+pnpm dev
+```
 
-## Available Scripts
+## Deploy contract (Celo Sepolia)
 
-- `pnpm dev` - Start development servers
-- `pnpm build` - Build all packages and apps
-- `pnpm lint` - Lint all packages and apps
-- `pnpm type-check` - Run TypeScript type checking
+```bash
+cd apps/contracts
+export PRIVATE_KEY=0x...
+forge script script/DeployTaskPay.s.sol --rpc-url celo_sepolia --broadcast
+```
 
-## Tech Stack
+Set `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` in `apps/web/.env.local`.
 
-- **Framework**: Next.js 14 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui
-- **Monorepo**: Turborepo
-- **Package Manager**: PNPM
+## Supabase
 
-## Learn More
+1. Create project at [supabase.com](https://supabase.com)
+2. Run `supabase/setup.sql`
+3. Create public bucket `task-evidence`
+4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Celo Documentation](https://docs.celo.org/)
-- [Turborepo Documentation](https://turbo.build/repo/docs)
-- [shadcn/ui Documentation](https://ui.shadcn.com/)
+## Test in MiniPay
+
+1. Enable Developer Mode + Use Testnet in MiniPay
+2. `pnpm dev` + `ngrok http 3000`
+3. Load ngrok URL via Load Test Page
+4. Run full flow with 2–3 wallets (5+ txs for hackathon rubric)
+
+## Deploy frontend (Vercel)
+
+Root directory: `apps/web`
+
+Env vars: `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA`, Supabase keys, optionally mainnet address.
+
+## Pitch
+
+> Get paid in digital Colombian pesos for completing real-world micro-tasks from your phone. COPm locked in escrow — nobody can steal the reward. Evidence URL stored onchain forever.
+
+## License
+
+MIT

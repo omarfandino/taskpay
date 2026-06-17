@@ -8,7 +8,17 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "clean": "turbo clean",
-    "type-check": "turbo type-check"
+    "type-check": "turbo type-check",
+    "contracts:build": "cd apps/contracts && forge build",
+    "contracts:test": "cd apps/contracts && forge test",
+    "deploy:sepolia": "bash scripts/deploy-sepolia.sh",
+    "deploy:mainnet": "bash scripts/deploy-mainnet.sh",
+    "fund:minipay": "bash scripts/fund-minipay.sh"
+  },
+  "dependencies": {
+    "@mento-protocol/mento-sdk": "1.19.0",
+    "ethers": "^5.7.2",
+    "viem": "^2.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",

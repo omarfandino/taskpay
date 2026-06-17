@@ -1,53 +1,167 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { UserBalance } from "@/components/user-balance";
-import { Zap } from "lucide-react";
+"use client";
 
-export default function Home() {
+import { useMemo, useState } from "react";
+import {
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
+import { MapPin, Zap } from "lucide-react";
+import { taskPayAbi } from "@/lib/taskpay-abi";
+import { Task } from "@/lib/constants";
+import { feeCurrencyFor } from "@/lib/tx";
+import { useMiniPay } from "@/hooks/useMiniPay";
+import { useTaskPayAddress } from "@/hooks/useTaskPayAddress";
+import { ContractNotDeployed } from "@/components/ContractNotDeployed";
+import { TaskCard } from "@/components/TaskCard";
+import { LowBalanceNotice } from "@/components/MiniPayGuard";
+import { SegmentTabs } from "@/components/SegmentTabs";
+import { EmptyState } from "@/components/EmptyState";
+import { parseTask, parseTasks } from "@/components/task-utils";
+import { getCurrentPosition, sortByDistance, LatLng } from "@/lib/geo";
+import { getExplorerUrl } from "@/lib/constants";
+
+type FilterMode = "all" | "nearby";
+
+export default function FeedPage() {
+  const { address, chainId } = useMiniPay();
+  const taskPayAddress = useTaskPayAddress();
+  const [filter, setFilter] = useState<FilterMode>("all");
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [takingId, setTakingId] = useState<bigint | null>(null);
+  const [lastTx, setLastTx] = useState<string | null>(null);
+
+  const { data: rawTasks, refetch, isLoading } = useReadContract({
+    address: taskPayAddress,
+    abi: taskPayAbi,
+    functionName: "getOpenTasks",
+    query: { enabled: Boolean(taskPayAddress) },
+  });
+
+  const { writeContractAsync, data: txHash, isPending } = useWriteContract();
+  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const tasks: Task[] = useMemo(() => {
+    const parsed = parseTasks(rawTasks as readonly Parameters<typeof parseTask>[0][] | undefined);
+    if (filter === "nearby" && userLocation) {
+      return sortByDistance(parsed, userLocation);
+    }
+    return parsed;
+  }, [rawTasks, filter, userLocation]);
+
+  async function handleNearby() {
+    setLocating(true);
+    try {
+      const pos = await getCurrentPosition();
+      setUserLocation(pos);
+      setFilter("nearby");
+    } catch {
+      alert("Could not get your location. Check permissions.");
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  async function handleTake(taskId: bigint) {
+    if (!taskPayAddress || !address) return;
+    setTakingId(taskId);
+    try {
+      const hash = await writeContractAsync({
+        address: taskPayAddress,
+        abi: taskPayAbi,
+        functionName: "takeTask",
+        args: [taskId],
+        ...feeCurrencyFor(chainId),
+      });
+      setLastTx(hash);
+      await refetch();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to take task. Check your balance and try again.");
+    } finally {
+      setTakingId(null);
+    }
+  }
+
   return (
-<main className="flex-1">
-  {/* Hero Section */}
-  <section className="relative py-20 lg:py-32">
-    <div className="container px-4 mx-auto max-w-7xl">
-      <div className="text-center max-w-4xl mx-auto">
-        {/* Badge */}
-        <div
-          className="inline-flex items-center gap-2 px-3 py-1 mb-8 text-sm font-medium bg-primary/10 text-primary rounded-full border border-primary/20"
-        >
-          <Zap className="h-4 w-4" />
-          Built on Celo
+    <div className="page-shell mx-auto max-w-lg px-4 pb-28 pt-5">
+      <section className="hero-panel mb-5 overflow-hidden rounded-2xl p-5 shadow-card">
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+          <Zap className="h-3.5 w-3.5" aria-hidden />
+          Live on Celo
         </div>
-
-        {/* Main Heading */}
-        <h1
-          className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6"
-        >
-          Welcome to{" "}
-          <span className="text-primary">taskpay</span>
-        </h1>
-
-        {/* Subtitle */}
-        <p
-          className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed"
-        >
-          Start building your decentralized application on Celo. Fast and secure blockchain for everyone.
+        <h2 className="font-heading text-2xl font-extrabold leading-tight tracking-tight text-foreground">
+          Earn COPm for{" "}
+          <span className="text-primary">real tasks</span>
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Take micro-jobs near you. Get paid in digital pesos — instantly on MiniPay.
         </p>
+      </section>
 
-        {/* User Balance Display */}
-        <UserBalance />
+      {address && <LowBalanceNotice />}
 
-        {/* CTA Buttons */}
-        <div
-          className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
-        >
-          <Button size="lg" className="px-8 py-3 text-base font-medium">
-            Get Started
-          </Button>
+      <SegmentTabs
+        tabs={[
+          { id: "all", label: "All tasks" },
+          {
+            id: "nearby",
+            label: locating ? "Locating…" : "Nearby",
+            icon: <MapPin className="h-4 w-4" />,
+          },
+        ]}
+        active={filter}
+        onChange={(id) => {
+          if (id === "nearby") {
+            handleNearby();
+          } else {
+            setFilter("all");
+          }
+        }}
+      />
+
+      {!taskPayAddress && <ContractNotDeployed />}
+
+      {isLoading && taskPayAddress && (
+        <div className="space-y-4 py-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="skeleton h-44 rounded-2xl" />
+          ))}
         </div>
-      </div>
-    </div>
-  </section>
+      )}
 
-</main>
+      {!isLoading && taskPayAddress && tasks.length === 0 && (
+        <EmptyState
+          title="No open tasks yet"
+          description="Be the first to post a micro-task and earn COPm!"
+        />
+      )}
+
+      <div className="space-y-4">
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.id.toString()}
+            task={task}
+            showTake
+            taking={takingId === task.id && (isPending || confirming)}
+            onTake={handleTake}
+          />
+        ))}
+      </div>
+
+      {lastTx && chainId && (
+        <p className="mt-4 text-center text-sm">
+          <a
+            href={getExplorerUrl(chainId, lastTx)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-primary underline"
+          >
+            View transaction on Celoscan
+          </a>
+        </p>
+      )}
+    </div>
   );
 }

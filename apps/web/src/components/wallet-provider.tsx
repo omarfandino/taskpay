@@ -1,33 +1,17 @@
 "use client";
 
-import { RainbowKitProvider, connectorsForWallets } from "@rainbow-me/rainbowkit";
-import "@rainbow-me/rainbowkit/styles.css";
-import { injectedWallet } from "@rainbow-me/rainbowkit/wallets";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { WagmiProvider, createConfig, http, useConnect } from "wagmi";
+import { WagmiProvider, createConfig, http, useConnect, useAccount } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
-import { ConnectButton } from "./connect-button";
-
-const connectors = connectorsForWallets(
-  [
-    {
-      groupName: "Recommended",
-      wallets: [injectedWallet],
-    },
-  ],
-  {
-    appName: "taskpay",
-    projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID!,
-  }
-);
+import { injected } from "wagmi/connectors";
 
 const wagmiConfig = createConfig({
-  chains: [celo, celoSepolia],
-  connectors,
+  chains: [celoSepolia, celo],
+  connectors: [injected()],
   transports: {
-    [celo.id]: http(),
-    [celoSepolia.id]: http(),
+    [celo.id]: http("https://forno.celo.org"),
+    [celoSepolia.id]: http("https://forno.celo-sepolia.celo-testnet.org"),
   },
   ssr: true,
 });
@@ -35,18 +19,18 @@ const wagmiConfig = createConfig({
 const queryClient = new QueryClient();
 
 function WalletProviderInner({ children }: { children: React.ReactNode }) {
-  const { connect, connectors } = useConnect();
+  const { connect } = useConnect();
+  const { isConnected } = useAccount();
 
   useEffect(() => {
-    // Check if the app is running inside MiniPay
-    if (window.ethereum && window.ethereum.isMiniPay) {
-      // Find the injected connector, which is what MiniPay uses
-      const injectedConnector = connectors.find((c) => c.id === "injected");
-      if (injectedConnector) {
-        connect({ connector: injectedConnector });
-      }
+    if (
+      typeof window !== "undefined" &&
+      window.ethereum?.isMiniPay &&
+      !isConnected
+    ) {
+      connect({ connector: injected() });
     }
-  }, [connect, connectors]);
+  }, [connect, isConnected]);
 
   return <>{children}</>;
 }
@@ -55,12 +39,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  if (!mounted) return null;
+
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
-          <WalletProviderInner>{children}</WalletProviderInner>
-        </RainbowKitProvider>
+        <WalletProviderInner>{children}</WalletProviderInner>
       </QueryClientProvider>
     </WagmiProvider>
   );

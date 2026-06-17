@@ -1,15 +1,26 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
+import type { Metadata } from "next";
+import { Outfit, Inter } from "next/font/google";
+import "./globals.css";
 
-import { Navbar } from '@/components/navbar';
-import { WalletProvider } from "@/components/wallet-provider"
+import { WalletProvider } from "@/components/wallet-provider";
+import { HeaderBalance } from "@/components/HeaderBalance";
+import { BottomNav } from "@/components/BottomNav";
+import { MiniPayBanner } from "@/components/MiniPayGuard";
 
-const inter = Inter({ subsets: ['latin'] });
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
-  title: 'taskpay',
-  description: 'A new Celo blockchain project',
+  title: "TaskPay — Earn digital pesos for real tasks",
+  description:
+    "Post and complete micro-tasks with COPm rewards. Built for MiniPay on Celo.",
 };
 
 export default function RootLayout({
@@ -18,17 +29,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        {/* Navbar is included on all pages */}
-        <div className="relative flex min-h-screen flex-col">
-          <WalletProvider>
-            <Navbar />
-            <main className="flex-1">
-              {children}
-            </main>
-          </WalletProvider>
-        </div>
+    <html lang="en" className="dark">
+      <body className={`${outfit.variable} ${inter.variable} font-body`}>
+        <WalletProvider>
+          <div className="relative flex min-h-screen flex-col">
+            <MiniPayBanner />
+            <HeaderBalance />
+            <main className="flex-1">{children}</main>
+            <BottomNav />
+          </div>
+        </WalletProvider>
       </body>
     </html>
   );

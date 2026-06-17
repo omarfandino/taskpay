@@ -1,0 +1,198 @@
+export const taskPayAbi = [
+  {
+    type: "function",
+    name: "postTask",
+    inputs: [
+      { name: "description", type: "string" },
+      { name: "location", type: "string" },
+      { name: "deadline", type: "uint256" },
+      { name: "reward", type: "uint256" },
+    ],
+    outputs: [{ name: "taskId", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "takeTask",
+    inputs: [{ name: "taskId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "submitEvidence",
+    inputs: [
+      { name: "taskId", type: "uint256" },
+      { name: "evidenceUrl", type: "string" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "approveTask",
+    inputs: [{ name: "taskId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "cancelTask",
+    inputs: [{ name: "taskId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getTask",
+    inputs: [{ name: "taskId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "id", type: "uint256" },
+          { name: "poster", type: "address" },
+          { name: "taker", type: "address" },
+          { name: "description", type: "string" },
+          { name: "location", type: "string" },
+          { name: "reward", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "status", type: "uint8" },
+          { name: "evidenceUrl", type: "string" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getOpenTasks",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        components: [
+          { name: "id", type: "uint256" },
+          { name: "poster", type: "address" },
+          { name: "taker", type: "address" },
+          { name: "description", type: "string" },
+          { name: "location", type: "string" },
+          { name: "reward", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "status", type: "uint8" },
+          { name: "evidenceUrl", type: "string" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTasksByPoster",
+    inputs: [{ name: "poster", type: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        components: [
+          { name: "id", type: "uint256" },
+          { name: "poster", type: "address" },
+          { name: "taker", type: "address" },
+          { name: "description", type: "string" },
+          { name: "location", type: "string" },
+          { name: "reward", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "status", type: "uint8" },
+          { name: "evidenceUrl", type: "string" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTasksByTaker",
+    inputs: [{ name: "taker", type: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        components: [
+          { name: "id", type: "uint256" },
+          { name: "poster", type: "address" },
+          { name: "taker", type: "address" },
+          { name: "description", type: "string" },
+          { name: "location", type: "string" },
+          { name: "reward", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "status", type: "uint8" },
+          { name: "evidenceUrl", type: "string" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "MIN_REWARD",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
+
+export const erc20Abi = [
+  {
+    type: "function",
+    name: "approve",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "allowance",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "transfer",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+] as const;
