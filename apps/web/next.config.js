@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ["*.trycloudflare.com"],
   async redirects() {
     return [
       { source: "/mis-tareas", destination: "/my-tasks", permanent: true },

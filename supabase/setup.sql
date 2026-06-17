@@ -11,9 +11,6 @@ create table if not exists evidence_photos (
 
 create index if not exists evidence_photos_task_id_idx on evidence_photos (task_id);
 
--- Storage bucket: create "task-evidence" as public in Supabase Dashboard
--- Policy: allow public read, authenticated/anon upload for hackathon MVP
-
 alter table evidence_photos enable row level security;
 
 create policy "Allow public read evidence_photos"
@@ -23,3 +20,18 @@ create policy "Allow public read evidence_photos"
 create policy "Allow anon insert evidence_photos"
   on evidence_photos for insert
   with check (true);
+
+-- Storage bucket: create "task-evidence" as PUBLIC in Supabase Dashboard
+-- Then run these policies:
+
+insert into storage.buckets (id, name, public)
+values ('task-evidence', 'task-evidence', true)
+on conflict (id) do update set public = true;
+
+create policy "Allow public read task-evidence"
+  on storage.objects for select
+  using (bucket_id = 'task-evidence');
+
+create policy "Allow anon upload task-evidence"
+  on storage.objects for insert
+  with check (bucket_id = 'task-evidence');

@@ -4,6 +4,7 @@ import { useReadContract } from "wagmi";
 import { erc20Abi } from "@/lib/taskpay-abi";
 import { getCopmAddress, getUsdmAddress } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
+import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { MINIPAY_DEPOSIT_URL } from "@/lib/constants";
 
 export function MiniPayBanner() {
@@ -32,6 +33,9 @@ export function MiniPayBanner() {
 
 export function LowBalanceNotice() {
   const { address, chainId } = useMiniPay();
+
+  if (DEMO_STORAGE_MODE) return null;
+
   const copm = getCopmAddress(chainId);
   const usdm = getUsdmAddress(chainId);
 

@@ -2,16 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import {
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
-import { taskPayAbi, erc20Abi } from "@/lib/taskpay-abi";
 import { MIN_REWARD_COPM, parseCopm, getExplorerUrl } from "@/lib/constants";
-import { feeCurrencyFor, getCopmAddress } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
-import { useTaskPayAddress } from "@/hooks/useTaskPayAddress";
+import { useTaskPayAvailable } from "@/hooks/useTaskPayReads";
+import {
+  useCopmAllowance,
+  useTaskPayActions,
+} from "@/hooks/useTaskPayActions";
 import { ContractNotDeployed } from "@/components/ContractNotDeployed";
 import { LocationField } from "@/components/LocationField";
 import { resolveLocationInput } from "@/lib/location";
@@ -36,7 +33,7 @@ const DEADLINE_OPTIONS = [
 
 export default function CreatePage() {
   const { address, chainId, mounted } = useMiniPay();
-  const taskPayAddress = useTaskPayAddress();
+  const taskPayAvailable = useTaskPayAvailable();
 
   const [description, setDescription] = useState("");
   const [reward, setReward] = useState("");
@@ -44,27 +41,15 @@ export default function CreatePage() {
   const [deadlineHours, setDeadlineHours] = useState(24);
   const [status, setStatus] = useState<string | null>(null);
   const [lastTx, setLastTx] = useState<string | null>(null);
+  const [simulated, setSimulated] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const copmAddress = getCopmAddress(chainId);
   const rewardAmount = parseCopm(reward);
-
-  const { data: allowance } = useReadContract({
-    address: copmAddress,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args:
-      address && taskPayAddress
-        ? [address, taskPayAddress]
-        : undefined,
-    query: { enabled: Boolean(mounted && address && taskPayAddress) },
-  });
-
-  const { writeContractAsync, data: txHash, isPending } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const { needsApproval } = useCopmAllowance(rewardAmount);
+  const { postTask, approveCopm, isPending } = useTaskPayActions();
 
   async function handlePublish() {
-    if (!taskPayAddress || !address) return;
+    if (!taskPayAvailable || !address) return;
     if (description.length === 0 || description.length > 280) {
       alert("Description must be 1–280 characters.");
       return;
@@ -92,30 +77,27 @@ export default function CreatePage() {
 
       const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineHours * 3600);
 
-      const needsApproval =
-        allowance === undefined || (allowance as bigint) < rewardAmount;
-
       if (needsApproval) {
         setStatus("Approving COPm…");
-        await writeContractAsync({
-          address: copmAddress,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [taskPayAddress, rewardAmount],
-          ...feeCurrencyFor(chainId),
-        });
+        await approveCopm(rewardAmount);
       }
 
       setStatus("Posting task…");
-      const hash = await writeContractAsync({
-        address: taskPayAddress,
-        abi: taskPayAbi,
-        functionName: "postTask",
-        args: [description.trim(), finalLocation, deadline, rewardAmount],
-        ...feeCurrencyFor(chainId),
-      });
+      const hash = await postTask(
+        description.trim(),
+        finalLocation,
+        deadline,
+        rewardAmount
+      );
 
-      setLastTx(hash);
+      if (hash === "demo-simulated") {
+        setSimulated(true);
+        setLastTx(null);
+      } else if (hash) {
+        setSimulated(false);
+        setLastTx(hash);
+      }
+
       setStatus("Task posted!");
       setDescription("");
       setReward("");
@@ -129,7 +111,7 @@ export default function CreatePage() {
     }
   }
 
-  const busy = submitting || isPending || confirming;
+  const busy = submitting || isPending;
 
   return (
     <div className="page-shell mx-auto max-w-lg px-4 pb-28 pt-5">
@@ -138,7 +120,7 @@ export default function CreatePage() {
         subtitle="Set a COPm reward and someone nearby will complete it."
       />
 
-      {!taskPayAddress && <ContractNotDeployed />}
+      {!taskPayAvailable && <ContractNotDeployed />}
       {mounted && address && <LowBalanceNotice />}
 
       <div className="space-y-5 block-card p-5">
@@ -203,7 +185,7 @@ export default function CreatePage() {
 
         <Button
           className="min-h-[48px] w-full gap-2 rounded-xl text-base font-bold shadow-glow transition-colors duration-200 disabled:opacity-70"
-          disabled={busy || !taskPayAddress || !address}
+          disabled={busy || !taskPayAvailable || !address}
           onClick={handlePublish}
         >
           {busy && (
@@ -216,7 +198,13 @@ export default function CreatePage() {
           <p className="text-center text-sm text-emerald-400">{status}</p>
         )}
 
-        {lastTx && chainId && (
+        {simulated && (
+          <p className="text-center text-sm text-muted-foreground">
+            Simulated — no on-chain transaction
+          </p>
+        )}
+
+        {lastTx && chainId && !simulated && (
           <p className="text-center text-sm">
             <a
               href={getExplorerUrl(chainId, lastTx)}

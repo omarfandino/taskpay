@@ -6,6 +6,8 @@ import { erc20Abi } from "@/lib/taskpay-abi";
 import { getCopmAddress, getUsdmAddress } from "@/lib/tx";
 import { formatCopm } from "@/lib/constants";
 import { useMiniPay } from "@/hooks/useMiniPay";
+import { useDemoBalance } from "@/hooks/useTaskPayReads";
+import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { LogoMark } from "@/components/LogoMark";
 
 export function HeaderBalance() {
@@ -13,12 +15,14 @@ export function HeaderBalance() {
   const copm = getCopmAddress(chainId);
   const usdm = getUsdmAddress(chainId);
 
+  const demoBalance = useDemoBalance(address);
+
   const { data: copmBalance } = useReadContract({
     address: copm,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address) },
+    query: { enabled: Boolean(address && !DEMO_STORAGE_MODE) },
   });
 
   const { data: usdmBalance } = useReadContract({
@@ -26,8 +30,12 @@ export function HeaderBalance() {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address) },
+    query: { enabled: Boolean(address && !DEMO_STORAGE_MODE) },
   });
+
+  const displayCopm = DEMO_STORAGE_MODE
+    ? demoBalance
+    : (copmBalance as bigint | undefined);
 
   if (!mounted) return null;
 
@@ -50,17 +58,20 @@ export function HeaderBalance() {
         {address && isConnected ? (
           <div className="shrink-0 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-right">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Balance
+              {DEMO_STORAGE_MODE ? "Demo balance" : "Balance"}
             </p>
             <p className="font-heading text-lg font-extrabold text-primary">
-              {copmBalance !== undefined
-                ? formatCopm(copmBalance as bigint)
+              {displayCopm !== undefined
+                ? formatCopm(displayCopm)
                 : "…"}
               <span className="ml-1 text-xs font-bold text-foreground/70">
                 COPm
               </span>
             </p>
-            {!isMiniPay && usdmBalance !== undefined && (
+            {DEMO_STORAGE_MODE && (
+              <p className="text-[10px] font-medium text-primary">Demo</p>
+            )}
+            {!DEMO_STORAGE_MODE && !isMiniPay && usdmBalance !== undefined && (
               <p className="text-[10px] text-muted-foreground">
                 {formatCopm(usdmBalance as bigint)} USDm network fees
               </p>

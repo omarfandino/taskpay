@@ -63,6 +63,9 @@ contract TaskPayTest is Test {
         vm.prank(taker);
         taskPay.submitEvidence(taskId, "https://example.com/photo.jpg");
 
+        vm.prank(taker);
+        taskPay.markTaskComplete(taskId);
+
         uint256 takerBefore = copm.balanceOf(taker);
 
         vm.prank(poster);
@@ -93,9 +96,9 @@ contract TaskPayTest is Test {
 
     function testRevertWhenRewardTooLow() public {
         vm.startPrank(poster);
-        copm.approve(address(taskPay), 100e18);
+        copm.approve(address(taskPay), 49e18);
         vm.expectRevert(TaskPay.InvalidReward.selector);
-        taskPay.postTask("Too cheap", "Bogota", block.timestamp + 1 hours, 100e18);
+        taskPay.postTask("Too cheap", "Bogota", block.timestamp + 1 hours, 49e18);
         vm.stopPrank();
     }
 

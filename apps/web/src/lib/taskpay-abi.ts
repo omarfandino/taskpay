@@ -30,6 +30,20 @@ export const taskPayAbi = [
   },
   {
     type: "function",
+    name: "markTaskComplete",
+    inputs: [{ name: "taskId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "rejectTask",
+    inputs: [{ name: "taskId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "approveTask",
     inputs: [{ name: "taskId", type: "uint256" }],
     outputs: [],

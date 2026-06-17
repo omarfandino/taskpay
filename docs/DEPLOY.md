@@ -12,7 +12,7 @@ pnpm deploy:sepolia
 
 Requires deployer wallet with:
 - CELO for gas (or USDm via fee abstraction from another wallet — deploy uses CELO from Foundry)
-- **4,000 COPm** minimum for seed tasks (2000 + 800 + 1200)
+- **150 COPm** minimum for seed tasks (50 + 50 + 50)
 
 Copy the logged contract address to `apps/web/.env.local`:
 

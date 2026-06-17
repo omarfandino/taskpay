@@ -3,6 +3,7 @@ import { Outfit, Inter } from "next/font/google";
 import "./globals.css";
 
 import { WalletProvider } from "@/components/wallet-provider";
+import { DemoStorageBanner } from "@/components/DemoStorageBanner";
 import { HeaderBalance } from "@/components/HeaderBalance";
 import { BottomNav } from "@/components/BottomNav";
 import { MiniPayBanner } from "@/components/MiniPayGuard";
@@ -34,6 +35,7 @@ export default function RootLayout({
         <WalletProvider>
           <div className="relative flex min-h-screen flex-col">
             <MiniPayBanner />
+            <DemoStorageBanner />
             <HeaderBalance />
             <main className="flex-1">{children}</main>
             <BottomNav />

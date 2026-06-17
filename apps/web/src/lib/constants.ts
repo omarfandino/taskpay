@@ -27,7 +27,7 @@ export const TASKPAY_ADDRESSES: Record<number, `0x${string}` | undefined> = {
     undefined,
 };
 
-export const MIN_REWARD_COPM = 500;
+export const MIN_REWARD_COPM = 50;
 export const MINIPAY_DEPOSIT_URL = "https://minipay.opera.com/add_cash";
 /** @deprecated use MINIPAY_DEPOSIT_URL */
 export const MINIPAY_ADD_CASH_URL = MINIPAY_DEPOSIT_URL;
@@ -51,8 +51,9 @@ export function getMapEmbedUrl(location: string): string {
 export enum TaskStatus {
   Open = 0,
   Taken = 1,
-  Completed = 2,
-  Cancelled = 3,
+  PendingReview = 2,
+  Completed = 3,
+  Cancelled = 4,
 }
 
 export type Task = {
@@ -73,6 +74,8 @@ export function statusLabel(status: TaskStatus): string {
       return "Open";
     case TaskStatus.Taken:
       return "Taken";
+    case TaskStatus.PendingReview:
+      return "Pending review";
     case TaskStatus.Completed:
       return "Completed";
     case TaskStatus.Cancelled:

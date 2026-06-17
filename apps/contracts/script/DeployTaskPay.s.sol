@@ -31,7 +31,7 @@ contract DeployTaskPay is Script {
             "Universidad Icesi, Cali",
             "Av. 6N #23-50, Cali"
         ];
-        uint256[3] memory rewards = [uint256(2000e18), uint256(800e18), uint256(1200e18)];
+        uint256[3] memory rewards = [uint256(50e18), uint256(50e18), uint256(50e18)];
         uint256[3] memory deadlines = [
             block.timestamp + 24 hours,
             block.timestamp + 1 hours,

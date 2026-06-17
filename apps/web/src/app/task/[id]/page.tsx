@@ -1,15 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Camera, MapPin } from "lucide-react";
-import {
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
-import { taskPayAbi } from "@/lib/taskpay-abi";
+import { ArrowLeft, MapPin } from "lucide-react";
 import {
   TaskStatus,
   formatCopm,
@@ -17,13 +12,17 @@ import {
   getMapUrl,
   getExplorerUrl,
 } from "@/lib/constants";
-import { feeCurrencyFor } from "@/lib/tx";
+import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
+import { isDemoSeedTask } from "@/lib/demo-store";
 import { useMiniPay } from "@/hooks/useMiniPay";
-import { useTaskPayAddress } from "@/hooks/useTaskPayAddress";
+import { useTaskById, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
+import { useTaskPayActions } from "@/hooks/useTaskPayActions";
 import { ContractNotDeployed } from "@/components/ContractNotDeployed";
-import { parseTask, Countdown, StatusBadge } from "@/components/task-utils";
+import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
+import { Countdown, StatusBadge, TaskStatusPanel } from "@/components/task-utils";
 import { uploadEvidencePhoto } from "@/lib/uploadEvidence";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { fetchEvidencePhotos } from "@/lib/evidencePhotos";
+import { getDemoEvidenceUrls } from "@/lib/demo-store";
 import { Button } from "@/components/ui/button";
 import { zeroAddress } from "viem";
 
@@ -31,25 +30,24 @@ export default function TaskDetailPage() {
   const params = useParams();
   const taskId = BigInt(params.id as string);
   const { address, chainId } = useMiniPay();
-  const taskPayAddress = useTaskPayAddress();
+  const taskPayAvailable = useTaskPayAvailable();
 
   const [uploading, setUploading] = useState(false);
   const [lastTx, setLastTx] = useState<string | null>(null);
+  const [simulated, setSimulated] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [remotePhotos, setRemotePhotos] = useState<string[]>([]);
+  const [photosVersion, setPhotosVersion] = useState(0);
 
-  const { data: rawTask, refetch } = useReadContract({
-    address: taskPayAddress,
-    abi: taskPayAbi,
-    functionName: "getTask",
-    args: [taskId],
-    query: { enabled: Boolean(taskPayAddress) },
-  });
-
-  const { writeContractAsync, data: txHash, isPending } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
-
-  const task = rawTask ? parseTask(rawTask as Parameters<typeof parseTask>[0]) : null;
-  const busy = isPending || confirming;
+  const { task, refetch } = useTaskById(taskId);
+  const {
+    submitEvidence,
+    markTaskComplete,
+    approveTask,
+    rejectTask,
+    cancelTask,
+    isPending,
+  } = useTaskPayActions();
 
   const isPoster =
     task && address && task.poster.toLowerCase() === address.toLowerCase();
@@ -59,76 +57,144 @@ export default function TaskDetailPage() {
     task.taker.toLowerCase() === address.toLowerCase() &&
     task.taker !== zeroAddress;
 
-  async function handleEvidenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !taskPayAddress || !address || !task) return;
+  useEffect(() => {
+    if (!task) return;
 
-    if (!isSupabaseConfigured()) {
-      alert("Supabase is not configured. Set env vars to upload evidence.");
+    async function loadPhotos() {
+      const fromSupabase = (await fetchEvidencePhotos(task!.id.toString())).map(
+        (p) => p.photo_url
+      );
+      const fromDemo = DEMO_STORAGE_MODE ? getDemoEvidenceUrls(task!.id) : [];
+      const merged = [...new Set([...fromDemo, ...fromSupabase])];
+      setRemotePhotos(merged);
+    }
+
+    void loadPhotos();
+  }, [task, photosVersion]);
+
+  const evidencePhotos = useMemo(() => {
+    const urls = [...remotePhotos];
+    if (task?.evidenceUrl && !urls.includes(task.evidenceUrl)) {
+      urls.push(task.evidenceUrl);
+    }
+    return urls;
+  }, [remotePhotos, task?.evidenceUrl]);
+
+  async function handleEvidenceUpload(file: File) {
+    if (!taskPayAvailable || !address || !task) {
+      alert("Connect your MiniPay wallet and open a task you have taken.");
+      return;
+    }
+
+    if (!isTaker || task.status !== TaskStatus.Taken) {
+      alert("You can only add evidence while the task is in progress.");
       return;
     }
 
     setUploading(true);
-    setStatusMsg("Uploading photo…");
+    setStatusMsg("Reading photo…");
     try {
+      setStatusMsg("Uploading photo…");
       const url = await uploadEvidencePhoto(task.id.toString(), address, file);
-      setStatusMsg("Submitting evidence onchain…");
-      const hash = await writeContractAsync({
-        address: taskPayAddress,
-        abi: taskPayAbi,
-        functionName: "submitEvidence",
-        args: [taskId, url],
-        ...feeCurrencyFor(chainId),
-      });
-      setLastTx(hash);
-      setStatusMsg("Evidence submitted!");
-      await refetch();
+
+      setStatusMsg("Saving evidence…");
+      const hash = await submitEvidence(taskId, url);
+      if (hash === "demo-simulated") {
+        setSimulated(true);
+        setLastTx(null);
+      } else if (hash) {
+        setSimulated(false);
+        setLastTx(hash);
+      }
+
+      setStatusMsg("Photo added!");
+      setPhotosVersion((v) => v + 1);
+      refetch();
     } catch (err) {
       console.error(err);
+      const message =
+        err instanceof Error ? err.message : "Could not upload evidence.";
       setStatusMsg("Upload failed.");
-      alert("Could not upload evidence. Try again.");
+      alert(message);
     } finally {
       setUploading(false);
     }
   }
 
-  async function handleApprove() {
-    if (!taskPayAddress) return;
+  async function handleMarkComplete() {
+    if (!taskPayAvailable || !address) return;
     try {
-      const hash = await writeContractAsync({
-        address: taskPayAddress,
-        abi: taskPayAbi,
-        functionName: "approveTask",
-        args: [taskId],
-        ...feeCurrencyFor(chainId),
-      });
-      setLastTx(hash);
-      await refetch();
+      const hash = await markTaskComplete(taskId);
+      if (hash === "demo-simulated") {
+        setSimulated(true);
+        setLastTx(null);
+      } else if (hash) {
+        setSimulated(false);
+        setLastTx(hash);
+      }
+      refetch();
+    } catch (err) {
+      console.error(err);
+      alert("Could not mark task complete. Add at least one photo first.");
+    }
+  }
+
+  async function handleApprove() {
+    if (!taskPayAvailable) return;
+    try {
+      const hash = await approveTask(taskId);
+      if (hash === "demo-simulated") {
+        setSimulated(true);
+        setLastTx(null);
+      } else if (hash) {
+        setSimulated(false);
+        setLastTx(hash);
+      }
+      refetch();
     } catch (err) {
       console.error(err);
       alert("Approval failed.");
     }
   }
 
-  async function handleCancel() {
-    if (!taskPayAddress) return;
+  async function handleReject() {
+    if (!taskPayAvailable) return;
+    if (!confirm("Reject this task? COPm will be refunded to you.")) return;
     try {
-      const hash = await writeContractAsync({
-        address: taskPayAddress,
-        abi: taskPayAbi,
-        functionName: "cancelTask",
-        args: [taskId],
-        ...feeCurrencyFor(chainId),
-      });
-      setLastTx(hash);
-      await refetch();
+      const hash = await rejectTask(taskId);
+      if (hash === "demo-simulated") {
+        setSimulated(true);
+        setLastTx(null);
+      } else if (hash) {
+        setSimulated(false);
+        setLastTx(hash);
+      }
+      refetch();
+    } catch (err) {
+      console.error(err);
+      alert("Reject failed.");
+    }
+  }
+
+  async function handleCancel() {
+    if (!taskPayAvailable) return;
+    try {
+      const hash = await cancelTask(taskId);
+      if (hash === "demo-simulated") {
+        setSimulated(true);
+        setLastTx(null);
+      } else if (hash) {
+        setSimulated(false);
+        setLastTx(hash);
+      }
+      refetch();
     } catch (err) {
       console.error(err);
       alert("Cancel failed.");
     }
   }
 
-  if (!taskPayAddress) {
+  if (!taskPayAvailable) {
     return (
       <div className="page-shell mx-auto max-w-lg px-4 pb-28 pt-5">
         <ContractNotDeployed />
@@ -144,6 +210,13 @@ export default function TaskDetailPage() {
       </div>
     );
   }
+
+  const busy = isPending;
+  const hasEvidence = evidencePhotos.length > 0;
+  const demoSeedReview =
+    DEMO_STORAGE_MODE &&
+    isDemoSeedTask(task.poster) &&
+    task.status === TaskStatus.PendingReview;
 
   return (
     <div className="page-shell mx-auto max-w-lg px-4 pb-28 pt-4 space-y-5">
@@ -161,6 +234,12 @@ export default function TaskDetailPage() {
         </h2>
         <StatusBadge status={task.status} />
       </div>
+
+      <TaskStatusPanel
+        task={task}
+        isTaker={Boolean(isTaker)}
+        isPoster={Boolean(isPoster)}
+      />
 
       <div className="reward-chip rounded-2xl p-5">
         <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -203,54 +282,111 @@ export default function TaskDetailPage() {
         />
       </div>
 
-      {task.evidenceUrl && (
+      {hasEvidence && (
         <div className="block-card p-4">
           <p className="mb-3 text-sm font-semibold text-foreground">
-            Evidence photo
+            Evidence photos ({evidencePhotos.length})
           </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={task.evidenceUrl}
-            alt="Task evidence"
-            className="w-full rounded-xl border object-cover max-h-80"
-          />
+          <div className="grid grid-cols-2 gap-3">
+            {evidencePhotos.map((url) => (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                key={url}
+                src={url}
+                alt="Task evidence"
+                className="aspect-square w-full rounded-xl border object-cover"
+              />
+            ))}
+          </div>
         </div>
       )}
 
-      {isTaker && task.status === TaskStatus.Taken && !task.evidenceUrl && (
-        <label className="block">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleEvidenceUpload}
+      {isTaker && task.status === TaskStatus.Taken && (
+        <>
+          <EvidenceUploadButton
             disabled={uploading || busy}
+            uploading={uploading}
+            statusMsg={statusMsg}
+            onFileSelected={handleEvidenceUpload}
           />
           <Button
-            className="w-full h-14 rounded-2xl text-base font-bold gap-2 shadow-glow"
-            disabled={uploading || busy}
-            asChild
+            type="button"
+            className="h-14 w-full gap-2 rounded-2xl text-base font-bold shadow-glow"
+            disabled={busy || !hasEvidence}
+            onClick={handleMarkComplete}
           >
-            <span>
-              <Camera className="h-5 w-5" />
-              {uploading ? statusMsg || "Uploading…" : "Upload evidence photo"}
-            </span>
+            <CheckCircle2 className="h-5 w-5" />
+            {busy ? "Processing…" : "Mark task complete"}
           </Button>
-        </label>
+        </>
       )}
 
-      {isPoster &&
-        task.status === TaskStatus.Taken &&
-        task.evidenceUrl.length > 0 && (
+      {isPoster && task.status === TaskStatus.PendingReview && !demoSeedReview && (
+        <div className="grid gap-3">
           <Button
-            className="w-full h-14 rounded-2xl text-base font-bold shadow-glow"
+            className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"
             disabled={busy}
-            onClick={handleApprove}
+            onClick={() => handleApprove()}
           >
             {busy ? "Processing…" : "Approve & pay"}
           </Button>
-        )}
+          <Button
+            variant="outline"
+            className="h-12 w-full rounded-2xl border-red-500/40 bg-red-500/10 text-base font-bold text-red-400 hover:bg-red-500/20"
+            disabled={busy}
+            onClick={() => handleReject()}
+          >
+            Reject (refund COPm)
+          </Button>
+        </div>
+      )}
+
+      {demoSeedReview && (
+        <div className="space-y-3 rounded-2xl border border-border bg-muted/50 p-4">
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-foreground">Demo poster review.</strong>{" "}
+            Check the evidence photos above, then approve or reject — same as a
+            real poster would on production.
+          </p>
+          <Button
+            className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"
+            disabled={busy}
+            onClick={async () => {
+              try {
+                await approveTask(taskId, true);
+                refetch();
+              } catch {
+                alert("Approval failed.");
+              }
+            }}
+          >
+            {busy ? "Processing…" : "Approve & pay"}
+          </Button>
+          <Button
+            variant="outline"
+            className="h-12 w-full rounded-2xl border-red-500/40 bg-red-500/10 text-base font-bold text-red-400 hover:bg-red-500/20"
+            disabled={busy}
+            onClick={async () => {
+              if (!confirm("Reject this work? COPm returns to the demo poster."))
+                return;
+              try {
+                await rejectTask(taskId, true);
+                refetch();
+              } catch {
+                alert("Reject failed.");
+              }
+            }}
+          >
+            Reject (refund COPm)
+          </Button>
+        </div>
+      )}
+
+      {!address && task.status === TaskStatus.Taken && (
+        <p className="text-center text-sm text-muted-foreground">
+          Connect your wallet to upload evidence.
+        </p>
+      )}
 
       {isPoster && task.status === TaskStatus.Open && (
         <Button
@@ -263,7 +399,23 @@ export default function TaskDetailPage() {
         </Button>
       )}
 
-      {lastTx && chainId && (
+      {statusMsg && !uploading && task.status === TaskStatus.Taken && (
+        <p
+          className={`text-center text-sm ${
+            statusMsg.includes("failed") ? "text-red-400" : "text-emerald-400"
+          }`}
+        >
+          {statusMsg}
+        </p>
+      )}
+
+      {simulated && (
+        <p className="text-center text-sm text-muted-foreground">
+          Simulated — no on-chain transaction
+        </p>
+      )}
+
+      {lastTx && chainId && !simulated && (
         <p className="text-center text-sm">
           <a
             href={getExplorerUrl(chainId, lastTx)}

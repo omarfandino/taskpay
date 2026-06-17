@@ -1,54 +1,41 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
 import { MapPin, Zap } from "lucide-react";
-import { taskPayAbi } from "@/lib/taskpay-abi";
 import { Task } from "@/lib/constants";
-import { feeCurrencyFor } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
-import { useTaskPayAddress } from "@/hooks/useTaskPayAddress";
+import { useOpenTasks, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
+import { useTaskPayActions } from "@/hooks/useTaskPayActions";
 import { ContractNotDeployed } from "@/components/ContractNotDeployed";
 import { TaskCard } from "@/components/TaskCard";
 import { LowBalanceNotice } from "@/components/MiniPayGuard";
 import { SegmentTabs } from "@/components/SegmentTabs";
 import { EmptyState } from "@/components/EmptyState";
-import { parseTask, parseTasks } from "@/components/task-utils";
 import { getCurrentPosition, sortByDistance, LatLng } from "@/lib/geo";
 import { getExplorerUrl } from "@/lib/constants";
+import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 
 type FilterMode = "all" | "nearby";
 
 export default function FeedPage() {
   const { address, chainId } = useMiniPay();
-  const taskPayAddress = useTaskPayAddress();
+  const taskPayAvailable = useTaskPayAvailable();
   const [filter, setFilter] = useState<FilterMode>("all");
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [locating, setLocating] = useState(false);
   const [takingId, setTakingId] = useState<bigint | null>(null);
   const [lastTx, setLastTx] = useState<string | null>(null);
+  const [simulated, setSimulated] = useState(false);
 
-  const { data: rawTasks, refetch, isLoading } = useReadContract({
-    address: taskPayAddress,
-    abi: taskPayAbi,
-    functionName: "getOpenTasks",
-    query: { enabled: Boolean(taskPayAddress) },
-  });
-
-  const { writeContractAsync, data: txHash, isPending } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const { tasks: openTasks, isLoading, refetch } = useOpenTasks();
+  const { takeTask, isPending } = useTaskPayActions();
 
   const tasks: Task[] = useMemo(() => {
-    const parsed = parseTasks(rawTasks as readonly Parameters<typeof parseTask>[0][] | undefined);
     if (filter === "nearby" && userLocation) {
-      return sortByDistance(parsed, userLocation);
+      return sortByDistance(openTasks, userLocation);
     }
-    return parsed;
-  }, [rawTasks, filter, userLocation]);
+    return openTasks;
+  }, [openTasks, filter, userLocation]);
 
   async function handleNearby() {
     setLocating(true);
@@ -64,18 +51,22 @@ export default function FeedPage() {
   }
 
   async function handleTake(taskId: bigint) {
-    if (!taskPayAddress || !address) return;
+    if (!address) {
+      alert("Connect a wallet first (MetaMask or MiniPay).");
+      return;
+    }
     setTakingId(taskId);
     try {
-      const hash = await writeContractAsync({
-        address: taskPayAddress,
-        abi: taskPayAbi,
-        functionName: "takeTask",
-        args: [taskId],
-        ...feeCurrencyFor(chainId),
-      });
-      setLastTx(hash);
-      await refetch();
+      const hash = await takeTask(taskId);
+      if (hash === "demo-simulated") {
+        setSimulated(true);
+        setLastTx(null);
+        alert("Task taken! Open My Tasks → Taken to upload evidence.");
+      } else if (hash) {
+        setSimulated(false);
+        setLastTx(hash);
+      }
+      refetch();
     } catch (err) {
       console.error(err);
       alert("Failed to take task. Check your balance and try again.");
@@ -89,7 +80,7 @@ export default function FeedPage() {
       <section className="hero-panel mb-5 overflow-hidden rounded-2xl p-5 shadow-card">
         <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
           <Zap className="h-3.5 w-3.5" aria-hidden />
-          Live on Celo
+          {DEMO_STORAGE_MODE ? "Demo mode" : "Live on Celo"}
         </div>
         <h2 className="font-heading text-2xl font-extrabold leading-tight tracking-tight text-foreground">
           Earn COPm for{" "}
@@ -121,9 +112,9 @@ export default function FeedPage() {
         }}
       />
 
-      {!taskPayAddress && <ContractNotDeployed />}
+      {!taskPayAvailable && <ContractNotDeployed />}
 
-      {isLoading && taskPayAddress && (
+      {isLoading && taskPayAvailable && (
         <div className="space-y-4 py-2">
           {[1, 2].map((i) => (
             <div key={i} className="skeleton h-44 rounded-2xl" />
@@ -131,7 +122,7 @@ export default function FeedPage() {
         </div>
       )}
 
-      {!isLoading && taskPayAddress && tasks.length === 0 && (
+      {!isLoading && taskPayAvailable && tasks.length === 0 && (
         <EmptyState
           title="No open tasks yet"
           description="Be the first to post a micro-task and earn COPm!"
@@ -144,13 +135,19 @@ export default function FeedPage() {
             key={task.id.toString()}
             task={task}
             showTake
-            taking={takingId === task.id && (isPending || confirming)}
+            taking={takingId === task.id && isPending}
             onTake={handleTake}
           />
         ))}
       </div>
 
-      {lastTx && chainId && (
+      {simulated && (
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          Simulated — no on-chain transaction
+        </p>
+      )}
+
+      {lastTx && chainId && !simulated && (
         <p className="mt-4 text-center text-sm">
           <a
             href={getExplorerUrl(chainId, lastTx)}

@@ -1,6 +1,8 @@
-import { getSupabase } from "./supabase";
+import { DEMO_STORAGE_MODE } from "./demo-config";
 
-async function compressImage(file: File, maxSizeBytes = 1_000_000): Promise<Blob> {
+const MAX_DEMO_DATA_URL_BYTES = 400_000;
+
+async function compressImage(file: File, maxSizeBytes = 800_000): Promise<Blob> {
   if (file.size <= maxSizeBytes) return file;
 
   return new Promise((resolve, reject) => {
@@ -31,7 +33,7 @@ async function compressImage(file: File, maxSizeBytes = 1_000_000): Promise<Blob
           resolve(blob);
         },
         "image/jpeg",
-        0.85
+        0.82
       );
     };
 
@@ -44,40 +46,112 @@ async function compressImage(file: File, maxSizeBytes = 1_000_000): Promise<Blob
   });
 }
 
+async function prepareUploadBlob(file: File): Promise<Blob> {
+  const isHeic =
+    file.type === "image/heic" ||
+    file.type === "image/heif" ||
+    file.name.toLowerCase().endsWith(".heic");
+
+  if (isHeic) {
+    throw new Error(
+      "HEIC photos are not supported. Use Take photo or save as JPEG."
+    );
+  }
+
+  if (file.size === 0) {
+    throw new Error("Photo file is empty. Try again.");
+  }
+
+  try {
+    return await compressImage(file);
+  } catch {
+    return file;
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read photo file"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function uploadViaApi(
+  taskId: string | number,
+  uploaderAddress: string,
+  blob: Blob,
+  fileName: string
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", blob, fileName);
+  formData.append("taskId", String(taskId));
+  formData.append("uploaderAddress", uploaderAddress);
+
+  const response = await fetch("/api/upload-evidence", {
+    method: "POST",
+    body: formData,
+  });
+
+  const payload = (await response.json()) as { url?: string; error?: string };
+
+  if (!response.ok || !payload.url) {
+    throw new Error(payload.error || "Upload failed.");
+  }
+
+  return payload.url;
+}
+
+async function uploadDemoFallback(blob: Blob): Promise<string> {
+  if (blob.size > MAX_DEMO_DATA_URL_BYTES) {
+    const smaller = await compressImage(
+      new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" }),
+      MAX_DEMO_DATA_URL_BYTES
+    );
+    return blobToDataUrl(smaller);
+  }
+  return blobToDataUrl(blob);
+}
+
+function mapUploadError(message: string): string {
+  if (
+    message.includes("Bucket not found") ||
+    message.includes("not found")
+  ) {
+    return "Storage bucket missing. Create public bucket 'task-evidence' in Supabase.";
+  }
+  if (
+    message.includes("policy") ||
+    message.includes("Unauthorized") ||
+    message.includes("403") ||
+    message.includes("row-level security")
+  ) {
+    return "Upload blocked by Supabase. Run supabase/setup.sql storage policies.";
+  }
+  return message;
+}
+
 export async function uploadEvidencePhoto(
   taskId: string | number,
   uploaderAddress: string,
   file: File
 ): Promise<string> {
-  const supabase = getSupabase();
-  if (!supabase) {
-    throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-    );
+  const blob = await prepareUploadBlob(file);
+  const fileName = file.name || `evidence-${Date.now()}.jpg`;
+
+  try {
+    return await uploadViaApi(taskId, uploaderAddress, blob, fileName);
+  } catch (apiError) {
+    if (!DEMO_STORAGE_MODE) {
+      throw new Error(
+        mapUploadError(
+          apiError instanceof Error ? apiError.message : "Upload failed."
+        )
+      );
+    }
+
+    console.warn("Supabase upload failed in demo mode, using local fallback", apiError);
+    return uploadDemoFallback(blob);
   }
-
-  const compressed = await compressImage(file);
-  const path = `${taskId}/${Date.now()}.jpg`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("task-evidence")
-    .upload(path, compressed, {
-      contentType: "image/jpeg",
-      upsert: false,
-    });
-
-  if (uploadError) {
-    throw new Error(uploadError.message);
-  }
-
-  const { data } = supabase.storage.from("task-evidence").getPublicUrl(path);
-  const photoUrl = data.publicUrl;
-
-  await supabase.from("evidence_photos").insert({
-    task_id: Number(taskId),
-    uploader_address: uploaderAddress.toLowerCase(),
-    photo_url: photoUrl,
-  });
-
-  return photoUrl;
 }

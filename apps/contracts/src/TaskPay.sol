@@ -11,6 +11,7 @@ contract TaskPay is ReentrancyGuard {
     enum TaskStatus {
         Open,
         Taken,
+        PendingReview,
         Completed,
         Cancelled
     }
@@ -29,7 +30,7 @@ contract TaskPay is ReentrancyGuard {
 
     IERC20 public immutable copmToken;
     uint256 public taskCount;
-    uint256 public constant MIN_REWARD = 500e18;
+    uint256 public constant MIN_REWARD = 50e18;
 
     mapping(uint256 => Task) private _tasks;
 
@@ -41,7 +42,9 @@ contract TaskPay is ReentrancyGuard {
     );
     event TaskTaken(uint256 indexed taskId, address indexed taker);
     event EvidenceSubmitted(uint256 indexed taskId, string evidenceUrl);
+    event TaskMarkedComplete(uint256 indexed taskId, address indexed taker);
     event TaskApproved(uint256 indexed taskId, address indexed taker, uint256 reward);
+    event TaskRejected(uint256 indexed taskId, address indexed poster, uint256 refund);
     event TaskCancelled(uint256 indexed taskId, address indexed poster, uint256 refund);
 
     error InvalidReward();
@@ -49,6 +52,7 @@ contract TaskPay is ReentrancyGuard {
     error TaskNotFound();
     error TaskNotOpen();
     error TaskNotTaken();
+    error TaskNotPendingReview();
     error DeadlinePassed();
     error NotPoster();
     error NotTaker();
@@ -112,9 +116,20 @@ contract TaskPay is ReentrancyGuard {
         emit EvidenceSubmitted(taskId, evidenceUrl);
     }
 
-    function approveTask(uint256 taskId) external nonReentrant {
+    function markTaskComplete(uint256 taskId) external {
         Task storage task = _requireTask(taskId);
         if (task.status != TaskStatus.Taken) revert TaskNotTaken();
+        if (msg.sender != task.taker) revert NotTaker();
+        if (bytes(task.evidenceUrl).length == 0) revert EvidenceRequired();
+
+        task.status = TaskStatus.PendingReview;
+
+        emit TaskMarkedComplete(taskId, msg.sender);
+    }
+
+    function approveTask(uint256 taskId) external nonReentrant {
+        Task storage task = _requireTask(taskId);
+        if (task.status != TaskStatus.PendingReview) revert TaskNotPendingReview();
         if (msg.sender != task.poster) revert NotPoster();
         if (bytes(task.evidenceUrl).length == 0) revert EvidenceRequired();
 
@@ -122,6 +137,17 @@ contract TaskPay is ReentrancyGuard {
         copmToken.safeTransfer(task.taker, task.reward);
 
         emit TaskApproved(taskId, task.taker, task.reward);
+    }
+
+    function rejectTask(uint256 taskId) external nonReentrant {
+        Task storage task = _requireTask(taskId);
+        if (task.status != TaskStatus.PendingReview) revert TaskNotPendingReview();
+        if (msg.sender != task.poster) revert NotPoster();
+
+        task.status = TaskStatus.Cancelled;
+        copmToken.safeTransfer(task.poster, task.reward);
+
+        emit TaskRejected(taskId, task.poster, task.reward);
     }
 
     function cancelTask(uint256 taskId) external nonReentrant {

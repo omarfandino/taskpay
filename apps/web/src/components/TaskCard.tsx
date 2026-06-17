@@ -9,7 +9,12 @@ import {
   getMapUrl,
   TaskStatus,
 } from "@/lib/constants";
-import { Countdown, StatusBadge } from "@/components/task-utils";
+import {
+  CountdownFromProvider,
+  DeadlineProgressBar,
+  DeadlineProvider,
+  StatusBadge,
+} from "@/components/task-utils";
 
 type TaskCardProps = {
   task: Task;
@@ -53,13 +58,15 @@ export function TaskCard({
           {task.status === TaskStatus.Open && (
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <Countdown deadline={task.deadline} />
+              <CountdownFromProvider />
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-border bg-muted/50 px-4 py-3">
+      {task.status === TaskStatus.Open && <DeadlineProgressBar />}
+
+      <div className="flex flex-col gap-3 bg-muted/50 px-4 py-3">
         <a
           href={getMapUrl(task.location)}
           target="_blank"
@@ -93,14 +100,38 @@ export function TaskCard({
     </article>
   );
 
+  const card = content;
+
+  if (showTake) {
+    if (task.status === TaskStatus.Open) {
+      return (
+        <DeadlineProvider deadline={task.deadline}>{card}</DeadlineProvider>
+      );
+    }
+    return card;
+  }
+
   if (linkToDetail) {
-    return (
+    const wrapped = (
       <Link
         href={`/task/${task.id.toString()}`}
         className="block cursor-pointer"
       >
         {content}
       </Link>
+    );
+
+    if (task.status === TaskStatus.Open) {
+      return (
+        <DeadlineProvider deadline={task.deadline}>{wrapped}</DeadlineProvider>
+      );
+    }
+    return wrapped;
+  }
+
+  if (task.status === TaskStatus.Open) {
+    return (
+      <DeadlineProvider deadline={task.deadline}>{content}</DeadlineProvider>
     );
   }
 
