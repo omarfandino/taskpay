@@ -28,7 +28,12 @@ export function MiniPayBanner() {
   );
 }
 
-export function LowBalanceNotice() {
+type LowBalanceNoticeProps = {
+  /** `browse` = Feed / take tasks (USDC fees only). `post` = Create (COPm reward + USDC fees). */
+  mode?: "browse" | "post";
+};
+
+export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
   const { address, chainId, isMiniPay } = useMiniPay();
 
   if (DEMO_STORAGE_MODE) return null;
@@ -52,7 +57,10 @@ export function LowBalanceNotice() {
     query: { enabled: Boolean(address) },
   });
 
-  const lowCopm = copmBal !== undefined && (copmBal as bigint) === 0n;
+  const lowCopm =
+    mode === "post" &&
+    copmBal !== undefined &&
+    (copmBal as bigint) === 0n;
   const lowUsdc =
     usdcBal !== undefined && (usdcBal as bigint) < 10n ** 6n;
 
@@ -62,7 +70,9 @@ export function LowBalanceNotice() {
     <div className="reward-chip mb-4 w-full flex-col items-start gap-1 p-4 text-sm text-foreground">
       {lowCopm && (
         <p>
-          You need <strong>COPm</strong> stablecoins to post or take tasks.
+          Posting needs <strong>COPm</strong> for the task reward (min 50 COPm).
+          Your welcome <strong>1 USDC</strong> is only for network fees, not
+          rewards.
           {isMiniPay ? (
             <>
               {" "}
@@ -75,13 +85,16 @@ export function LowBalanceNotice() {
               in MiniPay, then swap to COPm.
             </>
           ) : (
-            <> Fund this wallet via the deployer scripts or a Sepolia faucet.</>
+            <> Ask the deployer to run `pnpm fund:copm` to your address.</>
           )}
         </p>
       )}
       {lowUsdc && (
         <p className={lowCopm ? "mt-2" : undefined}>
-          Keep some <strong>USDC</strong> for network fees.{" "}
+          Keep some <strong>USDC</strong> for network fees.
+          {mode === "browse" && !lowCopm && (
+            <> New wallets get 1 USDC automatically — wait a few seconds after connecting.</>
+          )}{" "}
           {isMiniPay && (
             <>
               <a
@@ -90,7 +103,7 @@ export function LowBalanceNotice() {
               >
                 Deposit
               </a>{" "}
-              or use the{" "}
+              or{" "}
             </>
           )}
           <a

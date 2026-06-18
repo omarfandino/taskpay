@@ -165,7 +165,7 @@ export default function CreatePage() {
         </div>
       )}
 
-      {mounted && address && <LowBalanceNotice />}
+      {mounted && address && <LowBalanceNotice mode="post" />}
 
       <div className="space-y-5 block-card p-5">
         <div>

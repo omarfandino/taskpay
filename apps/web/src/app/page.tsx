@@ -108,7 +108,7 @@ export default function FeedPage() {
         </p>
       </section>
 
-      {address && <LowBalanceNotice />}
+      {address && <LowBalanceNotice mode="browse" />}
 
       {mounted && needsConnect && !isMiniPay && (
         <div className="mb-5">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { useMiniPay } from "@/hooks/useMiniPay";
 
@@ -14,6 +15,7 @@ type WelcomeStatus =
 
 export function useWelcomeUsdc() {
   const { address, mounted } = useMiniPay();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<WelcomeStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const claimedFor = useRef<string | null>(null);
@@ -50,11 +52,12 @@ export function useWelcomeUsdc() {
       setMessage(
         `You received ${payload.amount ?? "1"} USDC to cover network fees.`
       );
+      await queryClient.invalidateQueries({ queryKey: ["readContract"] });
     } catch {
       setStatus("error");
       setMessage("Welcome faucet unavailable. Try again later.");
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!mounted || !address || DEMO_STORAGE_MODE) {
