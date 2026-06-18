@@ -1,18 +1,32 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+
+export const maxDuration = 30;
+
+const MAX_BYTES = 4_000_000;
 
 export async function POST(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
     return NextResponse.json(
-      { error: "Supabase is not configured on the server." },
+      {
+        error:
+          "Supabase is not configured on the server. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.",
+      },
       { status: 503 }
     );
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json(
+      { error: "Could not read upload. Try a smaller photo (under 4 MB)." },
+      { status: 413 }
+    );
+  }
+
   const file = formData.get("file");
   const taskId = formData.get("taskId");
   const uploaderAddress = formData.get("uploaderAddress");
@@ -31,12 +45,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (file.size > MAX_BYTES) {
+    return NextResponse.json(
+      {
+        error:
+          "Photo is too large (max 4 MB). Use Take photo or choose a smaller image.",
+      },
+      { status: 413 }
+    );
+  }
+
   const contentType = file.type || "image/jpeg";
-  const ext = contentType.includes("png") ? "png" : "jpg";
+  const ext =
+    contentType.includes("png") || file.name.toLowerCase().endsWith(".png")
+      ? "png"
+      : "jpg";
   const path = `${taskId}/${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const supabase = createClient(url, key);
   const { error: uploadError } = await supabase.storage
     .from("task-evidence")
     .upload(path, buffer, {
@@ -45,7 +71,23 @@ export async function POST(request: NextRequest) {
     });
 
   if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 502 });
+    const message = uploadError.message || "Storage upload failed.";
+    const lower = message.toLowerCase();
+    let hint = "";
+    if (lower.includes("bucket")) {
+      hint =
+        " Create public bucket 'task-evidence' in Supabase and run supabase/setup.sql.";
+    } else if (lower.includes("policy") || lower.includes("row-level")) {
+      hint =
+        " Run supabase/setup.sql storage policies or set SUPABASE_SERVICE_ROLE_KEY in Vercel.";
+    } else if (lower.includes("fetch failed")) {
+      hint =
+        " Check NEXT_PUBLIC_SUPABASE_URL in Vercel matches Project Settings → API in Supabase (project must be active).";
+    }
+    return NextResponse.json(
+      { error: `${message}${hint}` },
+      { status: 502 }
+    );
   }
 
   const { data } = supabase.storage.from("task-evidence").getPublicUrl(path);

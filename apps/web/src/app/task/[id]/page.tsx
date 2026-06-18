@@ -108,7 +108,7 @@ export default function TaskDetailPage() {
       console.error(err);
       const message =
         err instanceof Error ? err.message : "Could not upload evidence.";
-      setStatusMsg("Upload failed.");
+      setStatusMsg(message);
       alert(message);
     } finally {
       setUploading(false);

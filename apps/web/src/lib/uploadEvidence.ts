@@ -94,7 +94,17 @@ async function uploadViaApi(
     body: formData,
   });
 
-  const payload = (await response.json()) as { url?: string; error?: string };
+  const raw = await response.text();
+  let payload: { url?: string; error?: string };
+  try {
+    payload = JSON.parse(raw) as { url?: string; error?: string };
+  } catch {
+    throw new Error(
+      response.status === 413
+        ? "Photo is too large. Try Take photo or a smaller image."
+        : `Upload server error (${response.status}). Check Supabase env vars on Vercel.`
+    );
+  }
 
   if (!response.ok || !payload.url) {
     throw new Error(payload.error || "Upload failed.");
@@ -132,12 +142,19 @@ function mapUploadError(message: string): string {
   return message;
 }
 
+const MAX_UPLOAD_BYTES = 3_500_000;
+
 export async function uploadEvidencePhoto(
   taskId: string | number,
   uploaderAddress: string,
   file: File
 ): Promise<string> {
   const blob = await prepareUploadBlob(file);
+  if (blob.size > MAX_UPLOAD_BYTES) {
+    throw new Error(
+      "Photo is too large after compression. Try Take photo or a smaller image."
+    );
+  }
   const fileName = file.name || `evidence-${Date.now()}.jpg`;
 
   try {
