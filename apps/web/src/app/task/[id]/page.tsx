@@ -53,6 +53,9 @@ export default function TaskDetailPage() {
   const [savedAnswerText, setSavedAnswerText] = useState("");
   const [answerUrl, setAnswerUrl] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<
+    "reject" | "cancel" | "demoReject" | null
+  >(null);
   const photosLoadIdRef = useRef(0);
 
   const { task, refetch } = useTaskById(taskId);
@@ -312,7 +315,7 @@ export default function TaskDetailPage() {
 
   async function handleReject() {
     if (!taskPayAvailable) return;
-    if (!confirm("Reject this task? COPm will be refunded to you.")) return;
+    setConfirmAction(null);
     try {
       const hash = await rejectTask(taskId);
       if (hash === "demo-simulated") {
@@ -323,15 +326,24 @@ export default function TaskDetailPage() {
         setLastTx(hash);
       }
       refetch();
+      router.push("/my-tasks");
     } catch (err) {
       console.error(err);
-      alert("Reject failed.");
+      const message =
+        err instanceof Error ? err.message : "Reject failed.";
+      alert(
+        message.includes("User rejected")
+          ? "Transaction cancelled."
+          : message.includes("insufficient funds") || message.includes("gas")
+            ? "Reject failed. Check you have USDC for network fees."
+            : message
+      );
     }
   }
 
   async function handleCancel() {
     if (!taskPayAvailable) return;
-    if (!confirm("Cancel this task? Your COPm reward will be refunded.")) return;
+    setConfirmAction(null);
     try {
       const hash = await cancelTask(taskId);
       if (hash === "demo-simulated") {
@@ -342,6 +354,7 @@ export default function TaskDetailPage() {
         setLastTx(hash);
       }
       refetch();
+      router.push("/my-tasks");
     } catch (err) {
       console.error(err);
       alert("Cancel failed.");
@@ -583,11 +596,83 @@ export default function TaskDetailPage() {
         </div>
       )}
 
+      {confirmAction === "reject" && (
+        <div className="block-card space-y-3 border border-red-500/40 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            Reject this task?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            COPm will be refunded to your wallet.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              className="h-11 flex-1 rounded-xl bg-red-500 font-bold text-white hover:bg-red-600"
+              disabled={actionBusy}
+              onClick={() => void handleReject()}
+            >
+              {actionBusy ? "Processing…" : "Reject"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 rounded-xl font-bold"
+              disabled={actionBusy}
+              onClick={() => setConfirmAction(null)}
+            >
+              Back
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isPoster && task.status === TaskStatus.Open && (
+        <>
+          {confirmAction === "cancel" && (
+            <div className="block-card space-y-3 border border-border p-4">
+              <p className="text-sm font-semibold text-foreground">
+                Cancel this task?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Your COPm reward will be refunded.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  className="h-11 flex-1 rounded-xl font-bold"
+                  disabled={actionBusy}
+                  onClick={() => void handleCancel()}
+                >
+                  {actionBusy ? "Processing…" : "Cancel task"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 flex-1 rounded-xl font-bold"
+                  disabled={actionBusy}
+                  onClick={() => setConfirmAction(null)}
+                >
+                  Back
+                </Button>
+              </div>
+            </div>
+          )}
+          <Button
+            variant="outline"
+            className="w-full h-12 rounded-2xl border-border bg-muted text-foreground hover:bg-muted/80"
+            disabled={actionBusy || confirmAction !== null}
+            onClick={() => setConfirmAction("cancel")}
+          >
+            Cancel task (refund COPm)
+          </Button>
+        </>
+      )}
+
       {isPoster && task.status === TaskStatus.PendingReview && !demoSeedReview && (
         <div className="grid gap-3">
           <Button
             className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"
-            disabled={actionBusy}
+            disabled={actionBusy || confirmAction !== null}
             onClick={() => handleApprove()}
           >
             {actionBusy ? "Processing…" : "Approve & pay"}
@@ -595,11 +680,49 @@ export default function TaskDetailPage() {
           <Button
             variant="outline"
             className="h-12 w-full rounded-2xl border-red-500/40 bg-red-500/10 text-base font-bold text-red-400 hover:bg-red-500/20"
-            disabled={actionBusy}
-            onClick={() => handleReject()}
+            disabled={actionBusy || confirmAction !== null}
+            onClick={() => setConfirmAction("reject")}
           >
             Reject (refund COPm)
           </Button>
+        </div>
+      )}
+
+      {confirmAction === "demoReject" && (
+        <div className="block-card space-y-3 border border-red-500/40 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            Reject this work?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            COPm returns to the demo poster.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              className="h-11 flex-1 rounded-xl bg-red-500 font-bold text-white hover:bg-red-600"
+              disabled={actionBusy}
+              onClick={async () => {
+                setConfirmAction(null);
+                try {
+                  await rejectTask(taskId, true);
+                  refetch();
+                } catch {
+                  alert("Reject failed.");
+                }
+              }}
+            >
+              {actionBusy ? "Processing…" : "Reject"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 rounded-xl font-bold"
+              disabled={actionBusy}
+              onClick={() => setConfirmAction(null)}
+            >
+              Back
+            </Button>
+          </div>
         </div>
       )}
 
@@ -627,17 +750,8 @@ export default function TaskDetailPage() {
           <Button
             variant="outline"
             className="h-12 w-full rounded-2xl border-red-500/40 bg-red-500/10 text-base font-bold text-red-400 hover:bg-red-500/20"
-            disabled={actionBusy}
-            onClick={async () => {
-              if (!confirm("Reject this work? COPm returns to the demo poster."))
-                return;
-              try {
-                await rejectTask(taskId, true);
-                refetch();
-              } catch {
-                alert("Reject failed.");
-              }
-            }}
+            disabled={actionBusy || confirmAction !== null}
+            onClick={() => setConfirmAction("demoReject")}
           >
             Reject (refund COPm)
           </Button>
@@ -648,17 +762,6 @@ export default function TaskDetailPage() {
         <p className="text-center text-sm text-muted-foreground">
           Connect your wallet to upload evidence.
         </p>
-      )}
-
-      {isPoster && task.status === TaskStatus.Open && (
-        <Button
-          variant="outline"
-          className="w-full h-12 rounded-2xl border-border bg-muted text-foreground hover:bg-muted/80"
-          disabled={actionBusy}
-          onClick={handleCancel}
-        >
-          Cancel task (refund COPm)
-        </Button>
       )}
 
       {statusMsg && !uploading && task.status === TaskStatus.Taken && (
