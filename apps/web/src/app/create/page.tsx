@@ -165,7 +165,7 @@ export default function CreatePage() {
           <textarea
             className="input-field mt-1.5 min-h-[120px] resize-none py-3"
             disabled={busy}
-            placeholder="e.g. Is there a sportswear store on Calle 5? Need a photo of the storefront."
+            placeholder="e.g. Photo of the storefront, or: what's the correct phone number?"
             maxLength={280}
             value={description}
             onChange={(e) => setDescription(e.target.value)}

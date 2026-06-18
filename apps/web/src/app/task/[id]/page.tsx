@@ -13,7 +13,7 @@ import {
   getExplorerUrl,
 } from "@/lib/constants";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
-import { isDemoSeedTask, demoSubmitEvidence, demoRemoveEvidence } from "@/lib/demo-store";
+import { isDemoSeedTask, demoSubmitEvidence, demoRemoveEvidence, getDemoTaskAnswer, demoSaveTaskAnswer } from "@/lib/demo-store";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskById, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
 import { useTaskPayActions } from "@/hooks/useTaskPayActions";
@@ -26,7 +26,9 @@ import {
   dedupeEvidenceUrls,
   evidenceUrlKey,
   evidenceUrlsMatch,
+  isAnswerEvidenceUrl,
 } from "@/lib/evidenceUrl";
+import { fetchTaskAnswer, saveTaskAnswer } from "@/lib/taskAnswers";
 import { getDemoEvidenceUrls } from "@/lib/demo-store";
 import { Button } from "@/components/ui/button";
 import { zeroAddress } from "viem";
@@ -46,6 +48,10 @@ export default function TaskDetailPage() {
   const [removedPhotoKeys, setRemovedPhotoKeys] = useState<string[]>([]);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
   const [confirmDeleteUrl, setConfirmDeleteUrl] = useState<string | null>(null);
+  const [answerText, setAnswerText] = useState("");
+  const [savedAnswerText, setSavedAnswerText] = useState("");
+  const [answerUrl, setAnswerUrl] = useState<string | null>(null);
+  const [savingAnswer, setSavingAnswer] = useState(false);
   const photosLoadIdRef = useRef(0);
 
   const { task, refetch } = useTaskById(taskId);
@@ -86,14 +92,44 @@ export default function TaskDetailPage() {
     void loadPhotos();
   }, [task, photosVersion]);
 
+  useEffect(() => {
+    if (!task) return;
+
+    async function loadAnswer() {
+      if (DEMO_STORAGE_MODE) {
+        const demo = getDemoTaskAnswer(task!.id);
+        setAnswerText(demo);
+        setSavedAnswerText(demo);
+        setAnswerUrl(null);
+        return;
+      }
+
+      const taker =
+        task!.taker !== zeroAddress ? task!.taker : undefined;
+      const row = await fetchTaskAnswer(task!.id.toString(), taker);
+      const text = row?.answer_text?.trim() ?? "";
+      setAnswerText(text);
+      setSavedAnswerText(text);
+      setAnswerUrl(row?.answer_url ?? null);
+    }
+
+    void loadAnswer();
+  }, [task]);
+
   const evidencePhotos = useMemo(() => {
     const removed = new Set(removedPhotoKeys);
     const merged = dedupeEvidenceUrls([
       ...remotePhotos,
       ...(task?.evidenceUrl ? [task.evidenceUrl] : []),
     ]);
-    return merged.filter((url) => !removed.has(evidenceUrlKey(url)));
+    return merged.filter(
+      (url) =>
+        !removed.has(evidenceUrlKey(url)) && !isAnswerEvidenceUrl(url)
+    );
   }, [remotePhotos, task?.evidenceUrl, removedPhotoKeys]);
+
+  const canComplete =
+    evidencePhotos.length > 0 || answerText.trim().length > 0;
 
   async function handleEvidenceUpload(file: File) {
     if (!taskPayAvailable || !address || !task) {
@@ -164,18 +200,83 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function handleMarkComplete() {
+  async function handleSaveAnswer() {
     if (!taskPayAvailable || !address || !task) return;
-    if (!hasEvidence) {
-      alert("Add at least one photo before completing.");
+    if (!isTaker || task.status !== TaskStatus.Taken) return;
+
+    const trimmed = answerText.trim();
+    if (!trimmed) {
+      alert("Write an answer or add a photo before completing.");
       return;
     }
 
-    const primaryUrl = evidencePhotos[0];
-    if (!primaryUrl) return;
+    setSavingAnswer(true);
+    setStatusMsg("Saving answer…");
+    try {
+      if (DEMO_STORAGE_MODE) {
+        demoSaveTaskAnswer(taskId, address, trimmed);
+        setSavedAnswerText(trimmed);
+      } else {
+        const { answerUrl: url } = await saveTaskAnswer(
+          task.id.toString(),
+          address,
+          trimmed
+        );
+        setSavedAnswerText(trimmed);
+        setAnswerUrl(url);
+      }
+      setStatusMsg("Answer saved.");
+    } catch (err) {
+      console.error(err);
+      const message =
+        err instanceof Error ? err.message : "Could not save answer.";
+      setStatusMsg(message);
+      alert(message);
+    } finally {
+      setSavingAnswer(false);
+    }
+  }
+
+  async function resolvePrimaryEvidenceUrl(): Promise<string> {
+    if (evidencePhotos[0]) return evidencePhotos[0];
+
+    const trimmed = answerText.trim();
+    if (!trimmed) {
+      throw new Error("Add at least one photo or a text answer.");
+    }
+
+    if (DEMO_STORAGE_MODE) {
+      demoSaveTaskAnswer(taskId, address!, trimmed);
+      setSavedAnswerText(trimmed);
+      return `demo-answer://${taskId}`;
+    }
+
+    if (trimmed !== savedAnswerText || !answerUrl) {
+      const { answerUrl: url } = await saveTaskAnswer(
+        task!.id.toString(),
+        address!,
+        trimmed
+      );
+      setSavedAnswerText(trimmed);
+      setAnswerUrl(url);
+      if (!url) throw new Error("Could not store answer.");
+      return url;
+    }
+
+    if (!answerUrl) throw new Error("Could not store answer.");
+    return answerUrl;
+  }
+
+  async function handleMarkComplete() {
+    if (!taskPayAvailable || !address || !task) return;
+    if (!canComplete) {
+      alert("Add at least one photo or write an answer before completing.");
+      return;
+    }
 
     try {
       setStatusMsg("Completing task on-chain…");
+      const primaryUrl = await resolvePrimaryEvidenceUrl();
       const hash = await completeTask(taskId, primaryUrl);
       if (hash === "demo-simulated") {
         setSimulated(true);
@@ -268,10 +369,13 @@ export default function TaskDetailPage() {
     );
   }
 
-  const busy = isPending;
-  const hasEvidence = evidencePhotos.length > 0;
   const editableEvidence =
     Boolean(isTaker && task.status === TaskStatus.Taken);
+  const busy = isPending || savingAnswer;
+  const hasEvidence = evidencePhotos.length > 0;
+  const showAnswerCard =
+    Boolean(savedAnswerText) &&
+    !(isTaker && task.status === TaskStatus.Taken);
   const demoSeedReview =
     DEMO_STORAGE_MODE &&
     isDemoSeedTask(task.poster) &&
@@ -427,19 +531,70 @@ export default function TaskDetailPage() {
           <EvidenceUploadButton
             disabled={uploading || busy}
             uploading={uploading}
-            statusMsg={statusMsg}
+            statusMsg={uploading ? statusMsg : null}
             onFileSelected={handleEvidenceUpload}
           />
+
+          <div className="block-card space-y-3 p-4">
+            <div>
+              <label
+                htmlFor="task-answer"
+                className="text-sm font-semibold text-foreground"
+              >
+                Answer{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                e.g. phone number, store hours, or other details. Photo, text,
+                or both — at least one to complete.
+              </p>
+            </div>
+            <textarea
+              id="task-answer"
+              className="input-field min-h-[100px] resize-none py-3"
+              disabled={busy}
+              placeholder="e.g. The correct phone number is 300 123 4567"
+              maxLength={500}
+              value={answerText}
+              onChange={(e) => setAnswerText(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {answerText.length}/500
+            </p>
+            {answerText.trim() !== savedAnswerText && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full rounded-xl font-bold"
+                disabled={busy || !answerText.trim()}
+                onClick={() => void handleSaveAnswer()}
+              >
+                {savingAnswer ? "Saving…" : "Save answer"}
+              </Button>
+            )}
+          </div>
+
           <Button
             type="button"
             className="h-14 w-full gap-2 rounded-2xl text-base font-bold shadow-glow"
-            disabled={busy || !hasEvidence}
+            disabled={busy || !canComplete}
             onClick={handleMarkComplete}
           >
             <CheckCircle2 className="h-5 w-5" />
             {busy ? "Processing…" : "Mark task complete"}
           </Button>
         </>
+      )}
+
+      {showAnswerCard && (
+        <div className="block-card p-4">
+          <p className="mb-2 text-sm font-semibold text-foreground">Answer</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {savedAnswerText}
+          </p>
+        </div>
       )}
 
       {isPoster && task.status === TaskStatus.PendingReview && !demoSeedReview && (
@@ -466,8 +621,8 @@ export default function TaskDetailPage() {
         <div className="space-y-3 rounded-2xl border border-border bg-muted/50 p-4">
           <p className="text-sm text-muted-foreground">
             <strong className="text-foreground">Demo poster review.</strong>{" "}
-            Check the evidence photos above, then approve or reject — same as a
-            real poster would on production.
+            Check the evidence photos and answer above, then approve or reject —
+            same as a real poster would on production.
           </p>
           <Button
             className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"

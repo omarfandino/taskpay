@@ -18,6 +18,7 @@ type SerializedTask = {
   status: TaskStatus;
   evidenceUrl: string;
   evidenceUrls?: string[];
+  textAnswer?: string;
 };
 
 type DemoData = {
@@ -183,6 +184,34 @@ export function getDemoEvidenceUrls(taskId: bigint): string[] {
   const raw = data.tasks.find((t) => t.id === taskId.toString());
   return raw ? getEvidenceUrls(raw) : [];
 }
+
+export function getDemoTaskAnswer(taskId: bigint): string {
+  const data = loadDemoData();
+  const raw = data.tasks.find((t) => t.id === taskId.toString());
+  return raw?.textAnswer?.trim() ?? "";
+}
+
+export function demoSaveTaskAnswer(
+  taskId: bigint,
+  taker: `0x${string}`,
+  answerText: string
+): void {
+  const text = answerText.trim().slice(0, 500);
+  if (!text) throw new Error("AnswerRequired");
+
+  const data = loadDemoData();
+  const raw = findTask(data, taskId);
+  const task = deserializeTask(raw);
+
+  if (task.status !== TaskStatus.Taken) throw new Error("TaskNotTaken");
+  if (normalizeAddress(task.taker) !== normalizeAddress(taker)) {
+    throw new Error("NotTaker");
+  }
+
+  raw.textAnswer = text;
+  saveDemoData(data);
+}
+
 
 function appendEvidence(raw: SerializedTask, url: string): void {
   const urls = getEvidenceUrls(raw);
@@ -375,7 +404,9 @@ export function demoApproveTask(
   if (normalizeAddress(task.poster) !== normalizeAddress(poster)) {
     throw new Error("NotPoster");
   }
-  if (getEvidenceUrls(raw).length === 0) throw new Error("EvidenceRequired");
+  if (getEvidenceUrls(raw).length === 0 && !raw.textAnswer?.trim()) {
+    throw new Error("EvidenceRequired");
+  }
 
   raw.status = TaskStatus.Completed;
   const takerBal = getBalance(data, task.taker);
