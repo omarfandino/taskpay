@@ -7,10 +7,10 @@ Built for [Agentes Onchain Colombia](https://hackathon.celocolombia.org/) — De
 ## Features
 
 - **COPm escrow** — rewards held in `TaskPay.sol` until approval
-- **USDm fee abstraction** — gas paid in USDm via MiniPay
+- **Fee abstraction** — MiniPay pays gas in USDC (no CELO required)
 - **Auto-connect** — no Connect Wallet button inside MiniPay
 - **Photo evidence** — Supabase storage (no gas); URL anchored onchain at complete
-- **Welcome USDm** — new wallets receive 0.5 USDm for network fees (API + CLI)
+- **Welcome USDm** — optional 0.5 USDm for new wallets (backup stablecoin for fees)
 - **Mobile-first** — single column, bottom nav, English UI
 
 ## Stack
@@ -52,7 +52,7 @@ Current Sepolia deploy (with `completeTask`): `0x7c9F688C05dcb2f2311cB296dE2D8f1
 | `pnpm fund:welcome <0xAddress> [0.5]` | Send USDm directly (2nd phone / manual) |
 | `pnpm fund:minipay` | Swap + send USDm to `MINIPAY_ADDRESS` |
 
-Deployer pays gas in CELO; users pay tx fees in **USDm**. Takers earn **COPm** rewards (not gas).
+Deployer pays gas in CELO; users pay tx fees in **USDC** via MiniPay. Takers earn **COPm** rewards.
 
 ## Welcome faucet (automatic)
 
@@ -85,8 +85,10 @@ Env vars:
 
 - `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` — `0x7c9F688C05dcb2f2311cB296dE2D8f1842f8A47A`
 - `NEXT_PUBLIC_DEMO_STORAGE_MODE=false`
-- Supabase URL + anon key
-- `WELCOME_FUNDER_PRIVATE_KEY` (server-only, same deployer as `PRIVATE_KEY` on PC)
+- `NEXT_PUBLIC_SUPABASE_URL` — `https://YOUR-PROJECT.supabase.co` (no `/rest/v1/`)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `WELCOME_FUNDER_PRIVATE_KEY` (server-only, optional welcome faucet)
+- `SUPABASE_SERVICE_ROLE_KEY` (optional, recommended for evidence uploads)
 
 ## Pitch
 

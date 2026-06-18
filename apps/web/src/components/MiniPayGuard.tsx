@@ -2,8 +2,7 @@
 
 import { useReadContract } from "wagmi";
 import { erc20Abi } from "@/lib/taskpay-abi";
-import { getCopmAddress, getUsdcAddress, getUsdmAddress } from "@/lib/tx";
-import { MINIPAY_FEE_TEST } from "@/lib/minipay-fee-test";
+import { getCopmAddress, getUsdcAddress } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { MINIPAY_DEPOSIT_URL } from "@/lib/constants";
@@ -38,9 +37,7 @@ export function LowBalanceNotice() {
   if (DEMO_STORAGE_MODE) return null;
 
   const copm = getCopmAddress(chainId);
-  const usdm = getUsdmAddress(chainId);
   const usdc = getUsdcAddress(chainId);
-  const feeToken = MINIPAY_FEE_TEST ? usdc : usdm;
 
   const { data: copmBal } = useReadContract({
     address: copm,
@@ -50,8 +47,8 @@ export function LowBalanceNotice() {
     query: { enabled: Boolean(address) },
   });
 
-  const { data: feeBal } = useReadContract({
-    address: feeToken,
+  const { data: usdcBal } = useReadContract({
+    address: usdc,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
@@ -59,10 +56,10 @@ export function LowBalanceNotice() {
   });
 
   const lowCopm = copmBal !== undefined && (copmBal as bigint) === 0n;
-  const lowFeeToken =
-    feeBal !== undefined && (feeBal as bigint) < (MINIPAY_FEE_TEST ? 10n ** 6n : 10n ** 17n);
+  const lowUsdc =
+    usdcBal !== undefined && (usdcBal as bigint) < 10n ** 6n;
 
-  if (!lowCopm && !lowFeeToken) return null;
+  if (!lowCopm && !lowUsdc) return null;
 
   return (
     <div className="reward-chip mb-4 w-full flex-col items-start gap-1 p-4 text-sm text-foreground">
@@ -75,16 +72,22 @@ export function LowBalanceNotice() {
           in MiniPay, then swap to COPm.
         </p>
       )}
-      {lowFeeToken && (
+      {lowUsdc && (
         <p className={lowCopm ? "mt-2" : undefined}>
-          Keep some <strong>{MINIPAY_FEE_TEST ? "USDC" : "USDm"}</strong> for
-          network fees.{" "}
+          Keep some <strong>USDC</strong> for network fees.{" "}
           <a href={MINIPAY_DEPOSIT_URL} className="font-bold text-primary underline transition-colors duration-200 hover:text-primary/80">
             Deposit
           </a>{" "}
-          {MINIPAY_FEE_TEST
-            ? "or use the Circle faucet (Celo Sepolia)."
-            : "to top up."}
+          or use the{" "}
+          <a
+            href="https://faucet.circle.com/"
+            className="font-bold text-primary underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Circle faucet
+          </a>{" "}
+          (Celo Sepolia).
         </p>
       )}
     </div>

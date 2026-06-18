@@ -8,8 +8,6 @@ import { HeaderBalance } from "@/components/HeaderBalance";
 import { BottomNav } from "@/components/BottomNav";
 import { MiniPayBanner } from "@/components/MiniPayGuard";
 import { WelcomeUsdmBanner } from "@/components/WelcomeUsdmBanner";
-import { MinipayFeeTestBanner } from "@/components/MinipayFeeTestBanner";
-import { MINIPAY_FEE_TEST } from "@/lib/minipay-fee-test";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -38,8 +36,7 @@ export default function RootLayout({
         <WalletProvider>
           <div className="relative flex min-h-screen flex-col">
             <MiniPayBanner />
-            <MinipayFeeTestBanner />
-            {!MINIPAY_FEE_TEST && <WelcomeUsdmBanner />}
+            <WelcomeUsdmBanner />
             <DemoStorageBanner />
             <HeaderBalance />
             <main className="flex-1">{children}</main>

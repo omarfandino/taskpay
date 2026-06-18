@@ -4,8 +4,8 @@
 
 - TaskPay deployed on Celo Sepolia (`NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` set)
 - MiniPay app with **Developer Mode** + **Use Testnet** enabled
-- 2–3 wallets with COPm + USDm (faucet CELO → swap in MiniPay/Mento)
-- Supabase configured for evidence upload (optional for take/approve flow test)
+- Wallets with **COPm** (rewards) + **USDC** (network fees via MiniPay fee abstraction)
+- Supabase configured for evidence upload
 
 ## Local testing with ngrok
 
@@ -25,7 +25,7 @@ In MiniPay: **Settings → Developer Settings → Load Test Page** → paste ngr
 | 1 | A (poster) | Approve COPm | `COPm.approve(TaskPay, amount)` |
 | 2 | A | Post task | `postTask(...)` |
 | 3 | B (taker) | Take task | `takeTask(id)` |
-| 4 | B | Submit evidence | `submitEvidence(id, url)` |
+| 4 | B | Upload photo + complete | Supabase + `completeTask(id, url)` |
 | 5 | A | Approve & pay | `approveTask(id)` |
 
 Optional extras: cancel open task, second task cycle, third wallet.
@@ -36,6 +36,8 @@ Sepolia explorer: https://sepolia.celoscan.io
 
 Filter by your TaskPay contract address to show all activity to judges.
 
+Check **Txn Type 123** and USDC transfers for fee abstraction.
+
 ## Timing target
 
 Primary actions (take task, post after allowance) should complete in **under 60 seconds**.
@@ -43,6 +45,6 @@ Primary actions (take task, post after allowance) should complete in **under 60 
 ## Troubleshooting
 
 - **No Connect button in MiniPay** — expected; auto-connect via `useMiniPay`
-- **Tx fails** — ensure USDm balance for gas (fee abstraction)
-- **No COPm** — swap from USDm in MiniPay or Mento testnet
-- **Evidence upload fails** — check Supabase bucket `task-evidence` is public
+- **Tx fails** — ensure USDC balance for gas (~0.02 USDC per tx)
+- **No COPm** — swap from USDC in MiniPay or Mento testnet
+- **Evidence upload fails** — check Supabase URL/key in Vercel and bucket `task-evidence`
