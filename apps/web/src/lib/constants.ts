@@ -18,14 +18,10 @@ export const TOKEN_ADDRESSES = {
   },
 } as const;
 
-/** Latest Sepolia deploy (completeTask). Override via env on Vercel. */
-export const TASKPAY_SEPOLIA_FALLBACK =
-  "0x7c9F688C05dcb2f2311cB296dE2D8f1842f8A47A" as const;
-
 export const TASKPAY_ADDRESSES: Record<number, `0x${string}` | undefined> = {
   [CHAIN_IDS.celoSepolia]:
     (process.env.NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA as `0x${string}`) ||
-    TASKPAY_SEPOLIA_FALLBACK,
+    undefined,
   [CHAIN_IDS.celo]:
     (process.env.NEXT_PUBLIC_TASKPAY_ADDRESS_MAINNET as `0x${string}`) ||
     undefined,
