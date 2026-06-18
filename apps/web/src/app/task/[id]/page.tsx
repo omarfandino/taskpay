@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, MapPin } from "lucide-react";
 import {
   TaskStatus,
@@ -35,6 +35,7 @@ import { zeroAddress } from "viem";
 
 export default function TaskDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const taskId = BigInt(params.id as string);
   const { address, chainId } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
@@ -269,6 +270,7 @@ export default function TaskDetailPage() {
       }
       setStatusMsg("Task submitted for review!");
       refetch();
+      router.push("/my-tasks");
     } catch (err) {
       console.error(err);
       const message =
