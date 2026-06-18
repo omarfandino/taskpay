@@ -78,6 +78,11 @@ create policy "Allow anon upload task-evidence"
   on storage.objects for insert
   with check (bucket_id = 'task-evidence');
 
+drop policy if exists "Allow anon update task-evidence" on storage.objects;
+create policy "Allow anon update task-evidence"
+  on storage.objects for update
+  using (bucket_id = 'task-evidence');
+
 drop policy if exists "Allow anon delete task-evidence" on storage.objects;
 create policy "Allow anon delete task-evidence"
   on storage.objects for delete

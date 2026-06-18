@@ -207,17 +207,17 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function persistAnswerIfNeeded(): Promise<void> {
+  async function persistAnswerIfNeeded(): Promise<string | null> {
     const trimmed = answerText.trim();
-    if (!trimmed || !address || !task) return;
+    if (!trimmed || !address || !task) return null;
 
     if (DEMO_STORAGE_MODE) {
       demoSaveTaskAnswer(taskId, address, trimmed);
       setSavedAnswerText(trimmed);
-      return;
+      return null;
     }
 
-    if (trimmed === savedAnswerText && answerUrl) return;
+    if (trimmed === savedAnswerText && answerUrl) return answerUrl;
 
     const { answerUrl: url } = await saveTaskAnswer(
       task.id.toString(),
@@ -226,10 +226,11 @@ export default function TaskDetailPage() {
     );
     setSavedAnswerText(trimmed);
     setAnswerUrl(url);
+    return url;
   }
 
   async function resolvePrimaryEvidenceUrl(): Promise<string> {
-    await persistAnswerIfNeeded();
+    const persistedAnswerUrl = await persistAnswerIfNeeded();
 
     if (evidencePhotos[0]) return evidencePhotos[0];
 
@@ -242,8 +243,9 @@ export default function TaskDetailPage() {
       return `demo-answer://${taskId}`;
     }
 
-    if (!answerUrl) throw new Error("Could not store answer.");
-    return answerUrl;
+    const url = persistedAnswerUrl ?? answerUrl;
+    if (!url) throw new Error("Could not store answer.");
+    return url;
   }
 
   async function handleMarkComplete() {
@@ -269,9 +271,19 @@ export default function TaskDetailPage() {
       refetch();
     } catch (err) {
       console.error(err);
+      const message =
+        err instanceof Error ? err.message : "Could not complete task.";
       setStatusMsg("Complete failed.");
+      const isGasHint =
+        message.includes("User rejected") ||
+        message.includes("insufficient funds") ||
+        message.includes("gas");
       alert(
-        "Could not complete task. Check you have USDC or another stablecoin for network fees."
+        message.includes("User rejected")
+          ? "Transaction cancelled."
+          : isGasHint
+            ? "Could not complete task. Check you have USDC or another stablecoin for network fees."
+            : message
       );
     } finally {
       setCompleting(false);
