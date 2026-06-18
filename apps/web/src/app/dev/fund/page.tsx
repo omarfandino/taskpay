@@ -48,8 +48,8 @@ export default function DevFundPage() {
     <main className="mx-auto max-w-md space-y-6 p-6">
       <h1 className="text-xl font-semibold">Send test USDC</h1>
       <p className="text-sm text-muted-foreground">
-        Dev helper: sends {AMOUNT} testnet USDC to the deploy wallet so we can
-        swap to USDm for TaskPay network fees. Not real money — testnet only.
+        Dev helper: sends {AMOUNT} testnet USDC for TaskPay network fees via
+        MiniPay fee abstraction. Not real money — testnet only.
       </p>
 
       {!isMiniPay && (

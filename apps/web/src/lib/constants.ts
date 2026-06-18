@@ -8,12 +8,10 @@ export const DEFAULT_CHAIN_ID = CHAIN_IDS.celoSepolia;
 export const TOKEN_ADDRESSES = {
   [CHAIN_IDS.celo]: {
     copm: "0x8a567e2ae79ca692bd748ab832081c45de4041ea" as const,
-    usdm: "0x765de816845861e75a25fca122bb6898b8b1282a" as const,
     usdc: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C" as const,
   },
   [CHAIN_IDS.celoSepolia]: {
     copm: "0x5F8d55c3627d2dc0a2B4afa798f877242F382F67" as const,
-    usdm: "0xdE9e4C3ce781b4bA68120d6261cbad65ce0aB00b" as const,
     usdc: "0x01C5C0122039549AD1493B8220cABEdD739BC44E" as const,
   },
 } as const;

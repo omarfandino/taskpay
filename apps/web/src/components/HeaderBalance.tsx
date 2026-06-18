@@ -3,7 +3,7 @@
 import { useReadContract } from "wagmi";
 import { Wallet, Sparkles } from "lucide-react";
 import { erc20Abi } from "@/lib/taskpay-abi";
-import { getCopmAddress, getUsdmAddress } from "@/lib/tx";
+import { getCopmAddress } from "@/lib/tx";
 import { formatCopm } from "@/lib/constants";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useDemoBalance } from "@/hooks/useTaskPayReads";
@@ -15,20 +15,11 @@ export function HeaderBalance() {
   const { address, chainId, mounted, isMiniPay, isConnected, needsConnect, isConnecting } =
     useMiniPay();
   const copm = getCopmAddress(chainId);
-  const usdm = getUsdmAddress(chainId);
 
   const demoBalance = useDemoBalance(address);
 
   const { data: copmBalance } = useReadContract({
     address: copm,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && !DEMO_STORAGE_MODE) },
-  });
-
-  const { data: usdmBalance } = useReadContract({
-    address: usdm,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
@@ -72,11 +63,6 @@ export function HeaderBalance() {
             </p>
             {DEMO_STORAGE_MODE && (
               <p className="text-[10px] font-medium text-primary">Demo</p>
-            )}
-            {!DEMO_STORAGE_MODE && !isMiniPay && usdmBalance !== undefined && (
-              <p className="text-[10px] text-muted-foreground">
-                {formatCopm(usdmBalance as bigint)} USDm network fees
-              </p>
             )}
           </div>
         ) : needsConnect ? (
