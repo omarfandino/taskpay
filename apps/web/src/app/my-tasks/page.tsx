@@ -9,12 +9,13 @@ import { PageHeader } from "@/components/PageHeader";
 import { SegmentTabs } from "@/components/SegmentTabs";
 import { EmptyState } from "@/components/EmptyState";
 
+import { ConnectWalletPrompt } from "@/components/ConnectWallet";
 import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
 
 type Tab = "posted" | "taken";
 
 export default function MyTasksPage() {
-  const { address, isMiniPay, mounted } = useMiniPay();
+  const { address, isMiniPay, mounted, needsConnect } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
   const [tab, setTab] = useState<Tab>("posted");
 
@@ -41,12 +42,19 @@ export default function MyTasksPage() {
         onChange={(id) => setTab(id as Tab)}
       />
 
-      {mounted && !address && (
-        <p className="py-10 text-center text-sm text-muted-foreground">
-          {isMiniPay
-            ? "Connecting your MiniPay wallet…"
-            : "Open TaskPay in MiniPay to see your tasks."}
-        </p>
+      {mounted && needsConnect && (
+        <div className="py-4">
+          {isMiniPay ? (
+            <p className="text-center text-sm text-muted-foreground">
+              Connecting your MiniPay wallet…
+            </p>
+          ) : (
+            <ConnectWalletPrompt
+              title="Sign in to see your tasks"
+              description="Connect the wallet you used to post or take tasks."
+            />
+          )}
+        </div>
       )}
 
       {!taskPayAvailable && <ContractNotDeployed />}

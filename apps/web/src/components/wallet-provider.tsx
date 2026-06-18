@@ -2,22 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { WagmiProvider, createConfig, http, useConnect, useAccount } from "wagmi";
-import { celo, celoSepolia } from "wagmi/chains";
-import { injected } from "wagmi/connectors";
+import { WagmiProvider, useConnect, useAccount } from "wagmi";
 import { CHAIN_IDS } from "@/lib/constants";
-
-const minipayConnector = injected({ target: "metaMask" });
-
-const wagmiConfig = createConfig({
-  chains: [celoSepolia, celo],
-  connectors: [minipayConnector],
-  transports: {
-    [celo.id]: http("https://forno.celo.org"),
-    [celoSepolia.id]: http("https://forno.celo-sepolia.celo-testnet.org"),
-  },
-  ssr: true,
-});
+import { minipayConnector, wagmiConfig } from "@/lib/wagmi-config";
 
 const queryClient = new QueryClient();
 

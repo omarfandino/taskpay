@@ -9,9 +9,11 @@ import { useMiniPay } from "@/hooks/useMiniPay";
 import { useDemoBalance } from "@/hooks/useTaskPayReads";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { LogoMark } from "@/components/LogoMark";
+import { ConnectWalletButton } from "@/components/ConnectWallet";
 
 export function HeaderBalance() {
-  const { address, chainId, mounted, isMiniPay, isConnected } = useMiniPay();
+  const { address, chainId, mounted, isMiniPay, isConnected, needsConnect, isConnecting } =
+    useMiniPay();
   const copm = getCopmAddress(chainId);
   const usdm = getUsdmAddress(chainId);
 
@@ -77,12 +79,19 @@ export function HeaderBalance() {
               </p>
             )}
           </div>
-        ) : (
-          <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            <Wallet className="h-3.5 w-3.5" />
-            {isMiniPay ? "Connecting…" : "Open in MiniPay"}
-          </div>
-        )}
+        ) : needsConnect ? (
+          isMiniPay ? (
+            <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <Wallet className="h-3.5 w-3.5" />
+              {isConnecting ? "Connecting…" : "MiniPay…"}
+            </div>
+          ) : (
+            <ConnectWalletButton
+              className="h-10 shrink-0 gap-1.5 rounded-xl px-4 text-sm font-bold shadow-glow"
+              label="Connect"
+            />
+          )
+        ) : null}
       </div>
     </header>
   );

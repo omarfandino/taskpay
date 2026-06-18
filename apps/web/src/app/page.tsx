@@ -12,6 +12,7 @@ import { LowBalanceNotice } from "@/components/MiniPayGuard";
 import { SegmentTabs } from "@/components/SegmentTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { getCurrentPosition, sortByDistance, LatLng } from "@/lib/geo";
+import { ConnectWalletPrompt } from "@/components/ConnectWallet";
 import { useRefreshTaskPayViewsAfterTx } from "@/hooks/useInvalidateTaskPayReads";
 import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
 import { getExplorerUrl } from "@/lib/constants";
@@ -20,7 +21,7 @@ import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 type FilterMode = "all" | "nearby";
 
 export default function FeedPage() {
-  const { address, chainId } = useMiniPay();
+  const { address, chainId, needsConnect, isMiniPay, mounted } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
   const [filter, setFilter] = useState<FilterMode>("all");
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
@@ -30,6 +31,7 @@ export default function FeedPage() {
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [simulated, setSimulated] = useState(false);
 
+  const refreshViewsAfterTx = useRefreshTaskPayViewsAfterTx();
   const { tasks: openTasks, isLoading, refetch } = useOpenTasks();
   const { takeTask, isPending } = useTaskPayActions();
 
@@ -60,7 +62,7 @@ export default function FeedPage() {
 
   async function handleTake(taskId: bigint) {
     if (!address) {
-      alert("Connect a wallet first (MetaMask or MiniPay).");
+      alert("Connect your wallet first using the Connect button above.");
       return;
     }
     const taskKey = taskId.toString();
@@ -68,9 +70,7 @@ export default function FeedPage() {
     try {
       const hash = await takeTask(taskId);
       setTakenTaskIds((prev) => new Set(prev).add(taskKey));
-      await refetch();
-      await new Promise((resolve) => setTimeout(resolve, 900));
-      await refetch();
+      await refreshViewsAfterTx();
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
@@ -109,6 +109,15 @@ export default function FeedPage() {
       </section>
 
       {address && <LowBalanceNotice />}
+
+      {mounted && needsConnect && !isMiniPay && (
+        <div className="mb-5">
+          <ConnectWalletPrompt
+            title="Sign in to take tasks"
+            description="Browse tasks below, then connect MetaMask on Celo Sepolia to take one and earn COPm."
+          />
+        </div>
+      )}
 
       <SegmentTabs
         tabs={[

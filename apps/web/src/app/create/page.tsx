@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MIN_REWARD_COPM, parseCopm, getExplorerUrl } from "@/lib/constants";
 import { useMiniPay } from "@/hooks/useMiniPay";
+import { ConnectWalletPrompt } from "@/components/ConnectWallet";
 import { useTaskPayAvailable } from "@/hooks/useTaskPayReads";
 import {
   useCopmAllowance,
@@ -39,9 +40,10 @@ export default function CreatePage() {
     chainId,
     mounted,
     isMiniPay,
-    isConnected,
     connectPending,
     connectError,
+    needsConnect,
+    wrongChain,
   } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
 
@@ -135,17 +137,13 @@ export default function CreatePage() {
     ? null
     : !taskPayAvailable
       ? "TaskPay contract is not configured on this deployment."
-      : !isMiniPay
-        ? "Open TaskPay inside the MiniPay app to publish."
-        : connectPending || (!address && isConnected === false)
-          ? "Connecting your MiniPay wallet…"
-          : !address
-            ? "Wallet not connected. Reload the page in MiniPay."
-            : connectError
-              ? `Wallet error: ${connectError}`
-              : chainId && chainId !== 11142220
-                ? "Switch MiniPay to Celo Sepolia testnet (Developer Settings)."
-                : null;
+      : needsConnect && isMiniPay
+        ? "Connecting your MiniPay wallet…"
+        : wrongChain
+          ? "Switch your wallet to Celo Sepolia testnet."
+          : connectError
+            ? `Wallet error: ${connectError}`
+            : null;
 
   const publishDisabled = busy || !taskPayAvailable || !address;
 
@@ -157,6 +155,16 @@ export default function CreatePage() {
       />
 
       {!taskPayAvailable && <ContractNotDeployed />}
+
+      {mounted && needsConnect && !isMiniPay && (
+        <div className="mb-5">
+          <ConnectWalletPrompt
+            title="Sign in to post tasks"
+            description="Connect MetaMask on Celo Sepolia. You need COPm for rewards and USDC for network fees."
+          />
+        </div>
+      )}
+
       {mounted && address && <LowBalanceNotice />}
 
       <div className="space-y-5 block-card p-5">

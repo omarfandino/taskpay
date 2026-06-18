@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useConnect, useAccount, useSwitchChain } from "wagmi";
-import { injected } from "wagmi/connectors";
 import { CHAIN_IDS } from "@/lib/constants";
+import { browserConnector, minipayConnector } from "@/lib/wagmi-config";
 
-const minipayConnector = injected({ target: "metaMask" });
+function detectMiniPay(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    (window as Window & { ethereum?: { isMiniPay?: boolean } }).ethereum
+      ?.isMiniPay === true
+  );
+}
 
 export function useMiniPay() {
   const { connect, isPending: connectPending } = useConnect();
@@ -17,35 +23,40 @@ export function useMiniPay() {
 
   useEffect(() => {
     setMounted(true);
-    const mp =
-      typeof window !== "undefined" &&
-      (window as Window & { ethereum?: { isMiniPay?: boolean } }).ethereum
-        ?.isMiniPay === true;
-    setIsMiniPay(mp);
+    setIsMiniPay(detectMiniPay());
+  }, []);
 
-    if (!mp || isConnected) return;
-
+  const connectWallet = useCallback(() => {
+    setConnectError(null);
+    const connector = detectMiniPay() ? minipayConnector : browserConnector;
     connect(
-      { connector: minipayConnector, chainId: CHAIN_IDS.celoSepolia },
+      { connector, chainId: CHAIN_IDS.celoSepolia },
       {
         onError: (err) => {
           setConnectError(err.message);
         },
       }
     );
-  }, [isConnected, connect]);
+  }, [connect]);
 
   useEffect(() => {
-    if (
-      !isMiniPay ||
-      !isConnected ||
-      chainId === CHAIN_IDS.celoSepolia ||
-      !switchChain
-    ) {
+    if (!isConnected || chainId === CHAIN_IDS.celoSepolia || !switchChain) {
       return;
     }
-    switchChain({ chainId: CHAIN_IDS.celoSepolia });
-  }, [chainId, isConnected, isMiniPay, switchChain]);
+    switchChain(
+      { chainId: CHAIN_IDS.celoSepolia },
+      {
+        onError: (err) => {
+          setConnectError(err.message);
+        },
+      }
+    );
+  }, [chainId, isConnected, switchChain]);
+
+  const wrongChain =
+    mounted && isConnected && chainId !== undefined && chainId !== CHAIN_IDS.celoSepolia;
+  const needsConnect = mounted && !address && !connectPending;
+  const isConnecting = mounted && connectPending;
 
   return {
     address,
@@ -56,5 +67,9 @@ export function useMiniPay() {
     connectPending,
     connectError,
     walletStatus: status,
+    connectWallet,
+    needsConnect,
+    isConnecting,
+    wrongChain,
   };
 }

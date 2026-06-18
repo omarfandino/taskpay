@@ -149,7 +149,7 @@ export default function TaskDetailPage() {
 
   async function handleEvidenceUpload(file: File) {
     if (!taskPayAvailable || !address || !task) {
-      alert("Connect your MiniPay wallet and open a task you have taken.");
+      alert("Connect your wallet to upload evidence.");
       return;
     }
 
