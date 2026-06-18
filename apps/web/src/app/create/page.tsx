@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { MIN_REWARD_COPM, parseCopm, getExplorerUrl } from "@/lib/constants";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskPayAvailable } from "@/hooks/useTaskPayReads";
@@ -32,6 +33,7 @@ const DEADLINE_OPTIONS = [
 ];
 
 export default function CreatePage() {
+  const router = useRouter();
   const {
     address,
     chainId,
@@ -110,6 +112,7 @@ export default function CreatePage() {
       setDescription("");
       setReward("");
       setLocation("");
+      router.push("/");
     } catch (err) {
       console.error(err);
       setStatus("Failed. Try again.");

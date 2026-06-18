@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, MapPin } from "lucide-react";
@@ -13,7 +13,7 @@ import {
   getExplorerUrl,
 } from "@/lib/constants";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
-import { isDemoSeedTask, demoSubmitEvidence } from "@/lib/demo-store";
+import { isDemoSeedTask, demoSubmitEvidence, demoRemoveEvidence } from "@/lib/demo-store";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskById, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
 import { useTaskPayActions } from "@/hooks/useTaskPayActions";
@@ -21,7 +21,7 @@ import { ContractNotDeployed } from "@/components/ContractNotDeployed";
 import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
 import { Countdown, StatusBadge, TaskStatusPanel } from "@/components/task-utils";
 import { uploadEvidencePhoto } from "@/lib/uploadEvidence";
-import { fetchEvidencePhotos } from "@/lib/evidencePhotos";
+import { fetchEvidencePhotos, deleteEvidencePhoto } from "@/lib/evidencePhotos";
 import { getDemoEvidenceUrls } from "@/lib/demo-store";
 import { Button } from "@/components/ui/button";
 import { zeroAddress } from "viem";
@@ -38,6 +38,7 @@ export default function TaskDetailPage() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [remotePhotos, setRemotePhotos] = useState<string[]>([]);
   const [photosVersion, setPhotosVersion] = useState(0);
+  const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
 
   const { task, refetch } = useTaskById(taskId);
   const {
@@ -115,6 +116,32 @@ export default function TaskDetailPage() {
     }
   }
 
+  async function handleEvidenceDelete(photoUrl: string) {
+    if (!taskPayAvailable || !address || !task) return;
+    if (!isTaker || task.status !== TaskStatus.Taken) return;
+    if (task.evidenceUrl === photoUrl) {
+      alert("This photo is already on-chain and cannot be removed.");
+      return;
+    }
+    if (!confirm("Remove this photo?")) return;
+
+    setDeletingUrl(photoUrl);
+    try {
+      if (DEMO_STORAGE_MODE) {
+        demoRemoveEvidence(taskId, address, photoUrl);
+      } else {
+        await deleteEvidencePhoto(task.id.toString(), address, photoUrl);
+      }
+      setPhotosVersion((v) => v + 1);
+      setStatusMsg("Photo removed.");
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Could not delete photo.");
+    } finally {
+      setDeletingUrl(null);
+    }
+  }
+
   async function handleMarkComplete() {
     if (!taskPayAvailable || !address || !task) return;
     if (!hasEvidence) {
@@ -185,6 +212,7 @@ export default function TaskDetailPage() {
 
   async function handleCancel() {
     if (!taskPayAvailable) return;
+    if (!confirm("Cancel this task? Your COPm reward will be refunded.")) return;
     try {
       const hash = await cancelTask(taskId);
       if (hash === "demo-simulated") {
@@ -220,6 +248,8 @@ export default function TaskDetailPage() {
 
   const busy = isPending;
   const hasEvidence = evidencePhotos.length > 0;
+  const editableEvidence =
+    Boolean(isTaker && task.status === TaskStatus.Taken);
   const demoSeedReview =
     DEMO_STORAGE_MODE &&
     isDemoSeedTask(task.poster) &&
@@ -296,13 +326,25 @@ export default function TaskDetailPage() {
           </p>
           <div className="grid grid-cols-2 gap-3">
             {evidencePhotos.map((url) => (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                key={url}
-                src={url}
-                alt="Task evidence"
-                className="aspect-square w-full rounded-xl border object-cover"
-              />
+              <div key={url} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt="Task evidence"
+                  className="aspect-square w-full rounded-xl border object-cover"
+                />
+                {editableEvidence && url !== task.evidenceUrl && (
+                  <button
+                    type="button"
+                    aria-label="Remove photo"
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm disabled:opacity-50"
+                    disabled={Boolean(deletingUrl)}
+                    onClick={() => void handleEvidenceDelete(url)}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>

@@ -308,6 +308,26 @@ export function demoSubmitEvidence(
   saveDemoData(data);
 }
 
+export function demoRemoveEvidence(
+  taskId: bigint,
+  taker: `0x${string}`,
+  evidenceUrl: string
+): void {
+  const data = loadDemoData();
+  const raw = findTask(data, taskId);
+  const task = deserializeTask(raw);
+
+  if (task.status !== TaskStatus.Taken) throw new Error("TaskNotTaken");
+  if (normalizeAddress(task.taker) !== normalizeAddress(taker)) {
+    throw new Error("NotTaker");
+  }
+
+  const urls = getEvidenceUrls(raw).filter((url) => url !== evidenceUrl);
+  raw.evidenceUrls = urls;
+  raw.evidenceUrl = urls[urls.length - 1] ?? "";
+  saveDemoData(data);
+}
+
 export function demoCompleteTask(
   taskId: bigint,
   taker: `0x${string}`,

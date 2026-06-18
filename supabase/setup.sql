@@ -23,6 +23,11 @@ create policy "Allow anon insert evidence_photos"
   on evidence_photos for insert
   with check (true);
 
+drop policy if exists "Allow anon delete evidence_photos" on evidence_photos;
+create policy "Allow anon delete evidence_photos"
+  on evidence_photos for delete
+  using (true);
+
 -- Storage bucket: public bucket for evidence images
 insert into storage.buckets (id, name, public)
 values ('task-evidence', 'task-evidence', true)
@@ -37,6 +42,11 @@ drop policy if exists "Allow anon upload task-evidence" on storage.objects;
 create policy "Allow anon upload task-evidence"
   on storage.objects for insert
   with check (bucket_id = 'task-evidence');
+
+drop policy if exists "Allow anon delete task-evidence" on storage.objects;
+create policy "Allow anon delete task-evidence"
+  on storage.objects for delete
+  using (bucket_id = 'task-evidence');
 
 -- Welcome USDm faucet (one claim per wallet)
 create table if not exists welcome_claims (
