@@ -141,7 +141,7 @@ export default function TaskDetailPage() {
       console.error(err);
       setStatusMsg("Complete failed.");
       alert(
-        "Could not complete task. Check USDm for network fees and try again."
+        "Could not complete task. Check you have USDC or another stablecoin for network fees."
       );
     }
   }

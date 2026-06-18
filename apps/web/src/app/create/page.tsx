@@ -110,7 +110,7 @@ export default function CreatePage() {
       alert(
         message.includes("User rejected")
           ? "Transaction cancelled."
-          : "Transaction failed. Check COPm balance and USDm for network fees."
+          : "Transaction failed. Check COPm balance and a stablecoin for network fees."
       );
     } finally {
       setSubmitting(false);

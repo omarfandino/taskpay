@@ -2,7 +2,8 @@
 
 import { useReadContract } from "wagmi";
 import { erc20Abi } from "@/lib/taskpay-abi";
-import { getCopmAddress, getUsdmAddress } from "@/lib/tx";
+import { getCopmAddress, getUsdcAddress, getUsdmAddress } from "@/lib/tx";
+import { MINIPAY_FEE_TEST } from "@/lib/minipay-fee-test";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { MINIPAY_DEPOSIT_URL } from "@/lib/constants";
@@ -38,6 +39,8 @@ export function LowBalanceNotice() {
 
   const copm = getCopmAddress(chainId);
   const usdm = getUsdmAddress(chainId);
+  const usdc = getUsdcAddress(chainId);
+  const feeToken = MINIPAY_FEE_TEST ? usdc : usdm;
 
   const { data: copmBal } = useReadContract({
     address: copm,
@@ -47,8 +50,8 @@ export function LowBalanceNotice() {
     query: { enabled: Boolean(address) },
   });
 
-  const { data: usdmBal } = useReadContract({
-    address: usdm,
+  const { data: feeBal } = useReadContract({
+    address: feeToken,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
@@ -56,9 +59,10 @@ export function LowBalanceNotice() {
   });
 
   const lowCopm = copmBal !== undefined && (copmBal as bigint) === 0n;
-  const lowUsdm = usdmBal !== undefined && (usdmBal as bigint) < 10n ** 17n;
+  const lowFeeToken =
+    feeBal !== undefined && (feeBal as bigint) < (MINIPAY_FEE_TEST ? 10n ** 6n : 10n ** 17n);
 
-  if (!lowCopm && !lowUsdm) return null;
+  if (!lowCopm && !lowFeeToken) return null;
 
   return (
     <div className="reward-chip mb-4 w-full flex-col items-start gap-1 p-4 text-sm text-foreground">
@@ -71,13 +75,16 @@ export function LowBalanceNotice() {
           in MiniPay, then swap to COPm.
         </p>
       )}
-      {lowUsdm && (
+      {lowFeeToken && (
         <p className={lowCopm ? "mt-2" : undefined}>
-          Keep some <strong>USDm</strong> for network fees.{" "}
+          Keep some <strong>{MINIPAY_FEE_TEST ? "USDC" : "USDm"}</strong> for
+          network fees.{" "}
           <a href={MINIPAY_DEPOSIT_URL} className="font-bold text-primary underline transition-colors duration-200 hover:text-primary/80">
             Deposit
           </a>{" "}
-          to top up.
+          {MINIPAY_FEE_TEST
+            ? "or use the Circle faucet (Celo Sepolia)."
+            : "to top up."}
         </p>
       )}
     </div>
