@@ -7,6 +7,7 @@ import { DemoStorageBanner } from "@/components/DemoStorageBanner";
 import { HeaderBalance } from "@/components/HeaderBalance";
 import { BottomNav } from "@/components/BottomNav";
 import { MiniPayBanner } from "@/components/MiniPayGuard";
+import { WelcomeUsdmBanner } from "@/components/WelcomeUsdmBanner";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -35,6 +36,7 @@ export default function RootLayout({
         <WalletProvider>
           <div className="relative flex min-h-screen flex-col">
             <MiniPayBanner />
+            <WelcomeUsdmBanner />
             <DemoStorageBanner />
             <HeaderBalance />
             <main className="flex-1">{children}</main>

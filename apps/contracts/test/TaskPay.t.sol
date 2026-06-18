@@ -77,6 +77,37 @@ contract TaskPayTest is Test {
         assertEq(uint256(task.status), uint256(TaskPay.TaskStatus.Completed));
     }
 
+    function testCompleteTaskSingleTx() public {
+        vm.startPrank(poster);
+        copm.approve(address(taskPay), REWARD);
+        uint256 taskId = taskPay.postTask(
+            "Photo of the bakery sign",
+            "Cali, Colombia",
+            block.timestamp + 24 hours,
+            REWARD
+        );
+        vm.stopPrank();
+
+        vm.prank(taker);
+        taskPay.takeTask(taskId);
+
+        vm.prank(taker);
+        taskPay.completeTask(taskId, "https://example.com/photo.jpg");
+
+        TaskPay.Task memory task = taskPay.getTask(taskId);
+        assertEq(uint256(task.status), uint256(TaskPay.TaskStatus.PendingReview));
+        assertEq(task.evidenceUrl, "https://example.com/photo.jpg");
+
+        uint256 takerBefore = copm.balanceOf(taker);
+
+        vm.prank(poster);
+        taskPay.approveTask(taskId);
+
+        assertEq(copm.balanceOf(taker), takerBefore + REWARD);
+        task = taskPay.getTask(taskId);
+        assertEq(uint256(task.status), uint256(TaskPay.TaskStatus.Completed));
+    }
+
     function testCancelOpenTask() public {
         vm.startPrank(poster);
         copm.approve(address(taskPay), REWARD);

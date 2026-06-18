@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import {
+  usePublicClient,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -14,7 +15,7 @@ import { useTaskPayAddress } from "@/hooks/useTaskPayAddress";
 import {
   demoApproveTask,
   demoCancelTask,
-  demoMarkTaskComplete,
+  demoCompleteTask,
   demoPostTask,
   demoRejectSeedTask,
   demoRejectTask,
@@ -66,6 +67,7 @@ export function useTaskPayActions() {
   const { address, chainId } = useMiniPay();
   const taskPayAddress = useTaskPayAddress();
   const copmAddress = getCopmAddress(chainId);
+  const publicClient = usePublicClient({ chainId });
 
   const { writeContractAsync, data: txHash, isPending } = useWriteContract();
   const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
@@ -74,6 +76,16 @@ export function useTaskPayActions() {
   const [simulatedTx, setSimulatedTx] = useState(false);
 
   const busy = DEMO_STORAGE_MODE ? demoPending : isPending || confirming;
+
+  const waitForReceipt = useCallback(
+    async (hash: `0x${string}`) => {
+      if (!publicClient) {
+        throw new Error("Network client not ready. Try again.");
+      }
+      await publicClient.waitForTransactionReceipt({ hash });
+    },
+    [publicClient]
+  );
 
   const runDemo = useCallback(async (fn: () => void) => {
     setDemoPending(true);
@@ -112,23 +124,34 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(chainId),
       });
       setSimulatedTx(false);
+      await waitForReceipt(hash);
       return hash;
     },
-    [address, runDemo, taskPayAddress, writeContractAsync, chainId]
+    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
   );
 
   const approveCopm = useCallback(
-    async (rewardAmount: bigint): Promise<void> => {
-      if (DEMO_STORAGE_MODE || !address || !taskPayAddress) return;
-      await writeContractAsync({
+    async (rewardAmount: bigint): Promise<`0x${string}` | null> => {
+      if (DEMO_STORAGE_MODE || !address || !taskPayAddress) return null;
+
+      const hash = await writeContractAsync({
         address: copmAddress,
         abi: erc20Abi,
         functionName: "approve",
         args: [taskPayAddress, rewardAmount],
         ...feeCurrencyFor(chainId),
       });
+      await waitForReceipt(hash);
+      return hash;
     },
-    [address, chainId, copmAddress, taskPayAddress, writeContractAsync]
+    [
+      address,
+      chainId,
+      copmAddress,
+      taskPayAddress,
+      waitForReceipt,
+      writeContractAsync,
+    ]
   );
 
   const takeTask = useCallback(
@@ -150,9 +173,10 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(chainId),
       });
       setSimulatedTx(false);
+      await waitForReceipt(hash);
       return hash;
     },
-    [address, runDemo, taskPayAddress, writeContractAsync, chainId]
+    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
   );
 
   const submitEvidence = useCallback(
@@ -176,9 +200,37 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(chainId),
       });
       setSimulatedTx(false);
+      await waitForReceipt(hash);
       return hash;
     },
-    [address, runDemo, taskPayAddress, writeContractAsync, chainId]
+    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
+  );
+
+  const completeTask = useCallback(
+    async (taskId: bigint, evidenceUrl: string): Promise<string | null> => {
+      if (!address) return null;
+
+      if (DEMO_STORAGE_MODE) {
+        await runDemo(() =>
+          demoCompleteTask(taskId, address, evidenceUrl)
+        );
+        return "demo-simulated";
+      }
+
+      if (!taskPayAddress) return null;
+
+      const hash = await writeContractAsync({
+        address: taskPayAddress,
+        abi: taskPayAbi,
+        functionName: "completeTask",
+        args: [taskId, evidenceUrl],
+        ...feeCurrencyFor(chainId),
+      });
+      setSimulatedTx(false);
+      await waitForReceipt(hash);
+      return hash;
+    },
+    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
   );
 
   const approveTask = useCallback(
@@ -204,9 +256,10 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(chainId),
       });
       setSimulatedTx(false);
+      await waitForReceipt(hash);
       return hash;
     },
-    [address, runDemo, taskPayAddress, writeContractAsync, chainId]
+    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
   );
 
   const rejectTask = useCallback(
@@ -232,9 +285,10 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(chainId),
       });
       setSimulatedTx(false);
+      await waitForReceipt(hash);
       return hash;
     },
-    [address, runDemo, taskPayAddress, writeContractAsync, chainId]
+    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
   );
 
   const markTaskComplete = useCallback(
@@ -242,8 +296,7 @@ export function useTaskPayActions() {
       if (!address) return null;
 
       if (DEMO_STORAGE_MODE) {
-        await runDemo(() => demoMarkTaskComplete(taskId, address));
-        return "demo-simulated";
+        throw new Error("Use completeTask with evidence URL in demo mode.");
       }
 
       if (!taskPayAddress) return null;
@@ -256,9 +309,10 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(chainId),
       });
       setSimulatedTx(false);
+      await waitForReceipt(hash);
       return hash;
     },
-    [address, runDemo, taskPayAddress, writeContractAsync, chainId]
+    [address, chainId, taskPayAddress, waitForReceipt, writeContractAsync]
   );
 
   const cancelTask = useCallback(
@@ -280,9 +334,10 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(chainId),
       });
       setSimulatedTx(false);
+      await waitForReceipt(hash);
       return hash;
     },
-    [address, runDemo, taskPayAddress, writeContractAsync, chainId]
+    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
   );
 
   return {
@@ -290,6 +345,7 @@ export function useTaskPayActions() {
     approveCopm,
     takeTask,
     submitEvidence,
+    completeTask,
     markTaskComplete,
     approveTask,
     rejectTask,

@@ -308,10 +308,13 @@ export function demoSubmitEvidence(
   saveDemoData(data);
 }
 
-export function demoMarkTaskComplete(
+export function demoCompleteTask(
   taskId: bigint,
-  taker: `0x${string}`
+  taker: `0x${string}`,
+  evidenceUrl: string
 ): void {
+  if (!evidenceUrl.trim()) throw new Error("EvidenceRequired");
+
   const data = loadDemoData();
   const raw = findTask(data, taskId);
   const task = deserializeTask(raw);
@@ -320,8 +323,8 @@ export function demoMarkTaskComplete(
   if (normalizeAddress(task.taker) !== normalizeAddress(taker)) {
     throw new Error("NotTaker");
   }
-  if (getEvidenceUrls(raw).length === 0) throw new Error("EvidenceRequired");
 
+  appendEvidence(raw, evidenceUrl);
   raw.status = TaskStatus.PendingReview;
   saveDemoData(data);
 }

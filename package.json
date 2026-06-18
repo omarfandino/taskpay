@@ -13,6 +13,8 @@
     "contracts:test": "cd apps/contracts && forge test",
     "deploy:sepolia": "bash scripts/deploy-sepolia.sh",
     "deploy:mainnet": "bash scripts/deploy-mainnet.sh",
+    "fund:swap": "node scripts/swap-usdc-to-usdm.mjs",
+    "fund:welcome": "node scripts/send-welcome-usdm.mjs",
     "fund:minipay": "bash scripts/fund-minipay.sh"
   },
   "dependencies": {

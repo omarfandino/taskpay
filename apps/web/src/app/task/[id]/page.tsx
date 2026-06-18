@@ -13,7 +13,7 @@ import {
   getExplorerUrl,
 } from "@/lib/constants";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
-import { isDemoSeedTask } from "@/lib/demo-store";
+import { isDemoSeedTask, demoSubmitEvidence } from "@/lib/demo-store";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskById, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
 import { useTaskPayActions } from "@/hooks/useTaskPayActions";
@@ -41,8 +41,7 @@ export default function TaskDetailPage() {
 
   const { task, refetch } = useTaskById(taskId);
   const {
-    submitEvidence,
-    markTaskComplete,
+    completeTask,
     approveTask,
     rejectTask,
     cancelTask,
@@ -61,9 +60,11 @@ export default function TaskDetailPage() {
     if (!task) return;
 
     async function loadPhotos() {
-      const fromSupabase = (await fetchEvidencePhotos(task!.id.toString())).map(
-        (p) => p.photo_url
-      );
+      const taker =
+        task!.taker !== zeroAddress ? task!.taker : undefined;
+      const fromSupabase = (
+        await fetchEvidencePhotos(task!.id.toString(), taker)
+      ).map((p) => p.photo_url);
       const fromDemo = DEMO_STORAGE_MODE ? getDemoEvidenceUrls(task!.id) : [];
       const merged = [...new Set([...fromDemo, ...fromSupabase])];
       setRemotePhotos(merged);
@@ -97,19 +98,12 @@ export default function TaskDetailPage() {
       setStatusMsg("Uploading photo…");
       const url = await uploadEvidencePhoto(task.id.toString(), address, file);
 
-      setStatusMsg("Saving evidence…");
-      const hash = await submitEvidence(taskId, url);
-      if (hash === "demo-simulated") {
-        setSimulated(true);
-        setLastTx(null);
-      } else if (hash) {
-        setSimulated(false);
-        setLastTx(hash);
+      if (DEMO_STORAGE_MODE) {
+        demoSubmitEvidence(taskId, address, url);
       }
 
-      setStatusMsg("Photo added!");
+      setStatusMsg("Photo added! (no gas — saved off-chain)");
       setPhotosVersion((v) => v + 1);
-      refetch();
     } catch (err) {
       console.error(err);
       const message =
@@ -122,9 +116,18 @@ export default function TaskDetailPage() {
   }
 
   async function handleMarkComplete() {
-    if (!taskPayAvailable || !address) return;
+    if (!taskPayAvailable || !address || !task) return;
+    if (!hasEvidence) {
+      alert("Add at least one photo before completing.");
+      return;
+    }
+
+    const primaryUrl = evidencePhotos[0];
+    if (!primaryUrl) return;
+
     try {
-      const hash = await markTaskComplete(taskId);
+      setStatusMsg("Completing task on-chain…");
+      const hash = await completeTask(taskId, primaryUrl);
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
@@ -132,10 +135,14 @@ export default function TaskDetailPage() {
         setSimulated(false);
         setLastTx(hash);
       }
+      setStatusMsg("Task submitted for review!");
       refetch();
     } catch (err) {
       console.error(err);
-      alert("Could not mark task complete. Add at least one photo first.");
+      setStatusMsg("Complete failed.");
+      alert(
+        "Could not complete task. Check USDm for network fees and try again."
+      );
     }
   }
 

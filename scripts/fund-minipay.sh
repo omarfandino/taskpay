@@ -13,6 +13,11 @@ if [ ! -f .env ]; then
 fi
 
 source .env
+DEPLOYER_ADDRESS="${DEPLOYER_ADDRESS:-$(cast wallet address "$PRIVATE_KEY" 2>/dev/null || true)}"
+if [ -z "${DEPLOYER_ADDRESS:-}" ]; then
+  echo "Error: set DEPLOYER_ADDRESS or valid PRIVATE_KEY in .env"
+  exit 1
+fi
 echo "Deployer: $DEPLOYER_ADDRESS"
 echo "MiniPay:  $MINIPAY_ADDRESS"
 echo ""

@@ -35,3 +35,23 @@ create policy "Allow public read task-evidence"
 create policy "Allow anon upload task-evidence"
   on storage.objects for insert
   with check (bucket_id = 'task-evidence');
+
+-- Welcome USDm faucet (one claim per wallet)
+create table if not exists welcome_claims (
+  address text primary key,
+  tx_hash text not null,
+  amount_wei text not null,
+  claimed_at timestamptz not null default now()
+);
+
+create index if not exists welcome_claims_claimed_at_idx on welcome_claims (claimed_at);
+
+alter table welcome_claims enable row level security;
+
+create policy "Allow public read welcome_claims"
+  on welcome_claims for select
+  using (true);
+
+create policy "Allow anon insert welcome_claims"
+  on welcome_claims for insert
+  with check (true);

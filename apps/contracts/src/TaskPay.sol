@@ -127,6 +127,20 @@ contract TaskPay is ReentrancyGuard {
         emit TaskMarkedComplete(taskId, msg.sender);
     }
 
+    /// @notice Submit evidence and mark complete in a single transaction (preferred taker flow).
+    function completeTask(uint256 taskId, string calldata evidenceUrl) external {
+        Task storage task = _requireTask(taskId);
+        if (task.status != TaskStatus.Taken) revert TaskNotTaken();
+        if (msg.sender != task.taker) revert NotTaker();
+        if (bytes(evidenceUrl).length == 0) revert EvidenceRequired();
+
+        task.evidenceUrl = evidenceUrl;
+        task.status = TaskStatus.PendingReview;
+
+        emit EvidenceSubmitted(taskId, evidenceUrl);
+        emit TaskMarkedComplete(taskId, msg.sender);
+    }
+
     function approveTask(uint256 taskId) external nonReentrant {
         Task storage task = _requireTask(taskId);
         if (task.status != TaskStatus.PendingReview) revert TaskNotPendingReview();

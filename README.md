@@ -9,7 +9,8 @@ Built for [Agentes Onchain Colombia](https://hackathon.celocolombia.org/) — De
 - **COPm escrow** — rewards held in `TaskPay.sol` until approval
 - **USDm fee abstraction** — gas paid in USDm via MiniPay
 - **Auto-connect** — no Connect Wallet button inside MiniPay
-- **Photo evidence** — Supabase storage, URL stored onchain
+- **Photo evidence** — Supabase storage (no gas); URL anchored onchain at complete
+- **Welcome USDm** — new wallets receive 0.5 USDm for network fees (API + CLI)
 - **Mobile-first** — single column, bottom nav, English UI
 
 ## Stack
@@ -39,6 +40,29 @@ forge script script/DeployTaskPay.s.sol --rpc-url celo_sepolia --broadcast
 
 Set `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` in `apps/web/.env.local`.
 
+Current Sepolia deploy (with `completeTask`): `0x7c9F688C05dcb2f2311cB296dE2D8f1842f8A47A`
+
+## Fund wallets (deployer on PC)
+
+`taskpay/.env` needs `PRIVATE_KEY` (deployer). Optional `MINIPAY_ADDRESS` for the default MiniPay phone.
+
+| Command | Purpose |
+|---------|---------|
+| `pnpm fund:swap [usdc] [usdm]` | Swap USDC → USDm on deployer (treasury) |
+| `pnpm fund:welcome <0xAddress> [0.5]` | Send USDm directly (2nd phone / manual) |
+| `pnpm fund:minipay` | Swap + send USDm to `MINIPAY_ADDRESS` |
+
+Deployer pays gas in CELO; users pay tx fees in **USDm**. Takers earn **COPm** rewards (not gas).
+
+## Welcome faucet (automatic)
+
+On first connect, the app calls `POST /api/welcome-usdm` to send **0.5 USDm** once per wallet.
+
+Server env in `apps/web` (Vercel + `.env.local`):
+
+- `WELCOME_FUNDER_PRIVATE_KEY` — deployer private key (never `NEXT_PUBLIC_`)
+- Run `welcome_claims` section in `supabase/setup.sql`
+
 ## Supabase
 
 1. Create project at [supabase.com](https://supabase.com)
@@ -57,7 +81,12 @@ Set `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` in `apps/web/.env.local`.
 
 Root directory: `apps/web`
 
-Env vars: `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA`, Supabase keys, optionally mainnet address.
+Env vars:
+
+- `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` — `0x7c9F688C05dcb2f2311cB296dE2D8f1842f8A47A`
+- `NEXT_PUBLIC_DEMO_STORAGE_MODE=false`
+- Supabase URL + anon key
+- `WELCOME_FUNDER_PRIVATE_KEY` (server-only, same deployer as `PRIVATE_KEY` on PC)
 
 ## Pitch
 

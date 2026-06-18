@@ -105,7 +105,13 @@ export default function CreatePage() {
     } catch (err) {
       console.error(err);
       setStatus("Failed. Try again.");
-      alert("Transaction failed. Check COPm balance and USDm for network fees.");
+      const message =
+        err instanceof Error ? err.message : "Transaction failed.";
+      alert(
+        message.includes("User rejected")
+          ? "Transaction cancelled."
+          : "Transaction failed. Check COPm balance and USDm for network fees."
+      );
     } finally {
       setSubmitting(false);
     }
