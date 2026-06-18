@@ -115,7 +115,7 @@ export default function CreatePage() {
       setDescription("");
       setReward("");
       setLocation("");
-      router.push("/my-tasks");
+      router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
       setStatus("Failed. Try again.");

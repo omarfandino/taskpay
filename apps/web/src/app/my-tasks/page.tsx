@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useMyTasks, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
 import { ContractNotDeployed } from "@/components/ContractNotDeployed";
@@ -10,6 +10,7 @@ import { SegmentTabs } from "@/components/SegmentTabs";
 import { EmptyState } from "@/components/EmptyState";
 
 import { ConnectWalletPrompt } from "@/components/ConnectWallet";
+import { useRefreshTaskPayViews } from "@/hooks/useInvalidateTaskPayReads";
 import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
 
 type Tab = "posted" | "taken";
@@ -18,8 +19,20 @@ export default function MyTasksPage() {
   const { address, isMiniPay, mounted, needsConnect } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
   const [tab, setTab] = useState<Tab>("posted");
+  const refreshViews = useRefreshTaskPayViews();
 
   useTaskPayViewRefreshOnMount(Boolean(address && taskPayAvailable));
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("tab");
+    if (requested === "taken" || requested === "posted") {
+      setTab(requested);
+      if (requested === "taken") {
+        void refreshViews();
+      }
+    }
+  }, [refreshViews]);
 
   const { posted, taken, isLoadingPosted, isLoadingTaken } = useMyTasks(address);
 
@@ -39,7 +52,12 @@ export default function MyTasksPage() {
           { id: "taken", label: "Taken" },
         ]}
         active={tab}
-        onChange={(id) => setTab(id as Tab)}
+        onChange={(id) => {
+          setTab(id as Tab);
+          if (id === "taken") {
+            void refreshViews();
+          }
+        }}
       />
 
       {mounted && needsConnect && (

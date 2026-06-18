@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MapPin, Zap } from "lucide-react";
 import { Task } from "@/lib/constants";
 import { useMiniPay } from "@/hooks/useMiniPay";
@@ -21,6 +22,7 @@ import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 type FilterMode = "all" | "nearby";
 
 export default function FeedPage() {
+  const router = useRouter();
   const { address, chainId, needsConnect, isMiniPay, mounted } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
   const [filter, setFilter] = useState<FilterMode>("all");
@@ -69,16 +71,19 @@ export default function FeedPage() {
     setTakingId(taskId);
     try {
       const hash = await takeTask(taskId);
+      if (hash == null) {
+        throw new Error("Could not take task.");
+      }
       setTakenTaskIds((prev) => new Set(prev).add(taskKey));
       await refreshViewsAfterTx();
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
-        alert("Task taken! Open My Tasks → Taken to upload evidence.");
       } else if (hash) {
         setSimulated(false);
         setLastTx(hash);
       }
+      router.push("/my-tasks?tab=taken");
     } catch (err) {
       setTakenTaskIds((prev) => {
         const next = new Set(prev);
