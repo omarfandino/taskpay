@@ -5,10 +5,13 @@ import { useEffect, useState } from "react";
 import { WagmiProvider, createConfig, http, useConnect, useAccount } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
+import { CHAIN_IDS } from "@/lib/constants";
+
+const minipayConnector = injected({ target: "metaMask" });
 
 const wagmiConfig = createConfig({
   chains: [celoSepolia, celo],
-  connectors: [injected()],
+  connectors: [minipayConnector],
   transports: {
     [celo.id]: http("https://forno.celo.org"),
     [celoSepolia.id]: http("https://forno.celo-sepolia.celo-testnet.org"),
@@ -28,7 +31,10 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       window.ethereum?.isMiniPay &&
       !isConnected
     ) {
-      connect({ connector: injected() });
+      connect({
+        connector: minipayConnector,
+        chainId: CHAIN_IDS.celoSepolia,
+      });
     }
   }, [connect, isConnected]);
 

@@ -32,7 +32,15 @@ const DEADLINE_OPTIONS = [
 ];
 
 export default function CreatePage() {
-  const { address, chainId, mounted } = useMiniPay();
+  const {
+    address,
+    chainId,
+    mounted,
+    isMiniPay,
+    isConnected,
+    connectPending,
+    connectError,
+  } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
 
   const [description, setDescription] = useState("");
@@ -119,6 +127,24 @@ export default function CreatePage() {
 
   const busy = submitting || isPending;
 
+  const publishBlockedReason = !mounted
+    ? null
+    : !taskPayAvailable
+      ? "TaskPay contract is not configured on this deployment."
+      : !isMiniPay
+        ? "Open TaskPay inside the MiniPay app to publish."
+        : connectPending || (!address && isConnected === false)
+          ? "Connecting your MiniPay wallet…"
+          : !address
+            ? "Wallet not connected. Reload the page in MiniPay."
+            : connectError
+              ? `Wallet error: ${connectError}`
+              : chainId && chainId !== 11142220
+                ? "Switch MiniPay to Celo Sepolia testnet (Developer Settings)."
+                : null;
+
+  const publishDisabled = busy || !taskPayAvailable || !address;
+
   return (
     <div className="page-shell mx-auto max-w-lg px-4 pb-28 pt-5">
       <PageHeader
@@ -191,7 +217,7 @@ export default function CreatePage() {
 
         <Button
           className="min-h-[48px] w-full gap-2 rounded-xl text-base font-bold shadow-glow transition-colors duration-200 disabled:opacity-70"
-          disabled={busy || !taskPayAvailable || !address}
+          disabled={publishDisabled}
           onClick={handlePublish}
         >
           {busy && (
@@ -199,6 +225,10 @@ export default function CreatePage() {
           )}
           {busy ? status || "Processing…" : "Publish task"}
         </Button>
+
+        {publishBlockedReason && !busy && (
+          <p className="text-center text-sm text-amber-300">{publishBlockedReason}</p>
+        )}
 
         {status && !busy && (
           <p className="text-center text-sm text-emerald-400">{status}</p>
