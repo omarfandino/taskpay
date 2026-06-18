@@ -59,13 +59,13 @@ From your PC (deployer needs **USDC + CELO** on Sepolia):
 # 1. Circle faucet → deployer address (USDC)
 # 2. CELO faucet → deployer (https://faucet.celo.org/celo-sepolia)
 # 3. Swap USDC → COPm and send to MiniPay:
-pnpm fund:copm 10 3000
-#        ^USDC   ^COPm amount to send
+pnpm fund:copm 5
+# Swaps 5 USDC → COPm at Mento rate and sends all COPm received to MiniPay
 ```
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm fund:copm [usdc] [copm]` | Swap USDC → COPm via Mento, send COPm to `MINIPAY_ADDRESS` |
+| `pnpm fund:copm [usdc]` | Swap USDC → COPm via Mento, send **all** COPm received to `MINIPAY_ADDRESS` (default: 5 USDC) |
 | `pnpm fund:usdc <0xAddress> [1]` | Send USDC directly (second phone / manual) |
 
 **In MiniPay:** you can also swap USDC → COPm inside the wallet (Mento) if you already have USDC.

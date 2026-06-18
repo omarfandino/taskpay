@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Swap USDC → COPm on Celo Sepolia via Mento, then send COPm to MiniPay.
+ * Swap USDC → COPm on Celo Sepolia via Mento, then send all COPm received to MiniPay.
  * Requires: PRIVATE_KEY, MINIPAY_ADDRESS in taskpay/.env
  *
  * Prereqs:
  * - Deployer has USDC (Circle faucet → deployer address)
  * - Deployer has CELO for gas (faucet.celo.org/celo-sepolia)
  *
- * Usage: pnpm fund:copm [usdcAmount] [copmAmount]
- * Example: pnpm fund:copm 20 5000
+ * Usage: pnpm fund:copm [usdcAmount]
+ * Example: pnpm fund:copm 5
  */
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
@@ -37,8 +37,7 @@ const ERC20_ABI = [
   "function transfer(address,uint256) returns (bool)",
 ];
 
-const usdcAmount = ethers.utils.parseUnits(process.argv[2] ?? "10", 6);
-const sendCopm = ethers.utils.parseUnits(process.argv[3] ?? "3000", 18);
+const usdcAmount = ethers.utils.parseUnits(process.argv[2] ?? "5", 6);
 
 async function main() {
   if (!env.PRIVATE_KEY || !env.MINIPAY_ADDRESS) {
@@ -67,6 +66,8 @@ async function main() {
     `Quote: ${ethers.utils.formatUnits(usdcAmount, 6)} USDC → ~${ethers.utils.formatUnits(expectedOut, 18)} COPm`
   );
 
+  const copmBefore = await copm.balanceOf(signer.address);
+
   const broker = await mento.getBroker();
   const allowance = await usdc.allowance(signer.address, broker.address);
   if (allowance.lt(usdcAmount)) {
@@ -80,13 +81,17 @@ async function main() {
   console.log("Swap tx:", swapTx.hash);
   await swapTx.wait();
 
-  const copmBal = await copm.balanceOf(signer.address);
-  console.log(`COPm after swap: ${ethers.utils.formatUnits(copmBal, 18)}`);
+  const copmAfter = await copm.balanceOf(signer.address);
+  const received = copmAfter.sub(copmBefore);
+  if (received.lte(0)) {
+    throw new Error("Swap did not increase COPm balance.");
+  }
 
-  const transferAmount = sendCopm.gt(copmBal) ? copmBal : sendCopm;
-  const transferTx = await copm.transfer(env.MINIPAY_ADDRESS, transferAmount);
+  console.log(`COPm received: ${ethers.utils.formatUnits(received, 18)}`);
+
+  const transferTx = await copm.transfer(env.MINIPAY_ADDRESS, received);
   console.log(
-    `Sent ${ethers.utils.formatUnits(transferAmount, 18)} COPm to MiniPay`
+    `Sent ${ethers.utils.formatUnits(received, 18)} COPm to MiniPay`
   );
   console.log("Transfer tx:", transferTx.hash);
   await transferTx.wait();
