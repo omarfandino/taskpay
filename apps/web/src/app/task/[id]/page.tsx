@@ -51,7 +51,7 @@ export default function TaskDetailPage() {
   const [answerText, setAnswerText] = useState("");
   const [savedAnswerText, setSavedAnswerText] = useState("");
   const [answerUrl, setAnswerUrl] = useState<string | null>(null);
-  const [savingAnswer, setSavingAnswer] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const photosLoadIdRef = useRef(0);
 
   const { task, refetch } = useTaskById(taskId);
@@ -95,9 +95,12 @@ export default function TaskDetailPage() {
   useEffect(() => {
     if (!task) return;
 
+    let cancelled = false;
+
     async function loadAnswer() {
       if (DEMO_STORAGE_MODE) {
         const demo = getDemoTaskAnswer(task!.id);
+        if (cancelled) return;
         setAnswerText(demo);
         setSavedAnswerText(demo);
         setAnswerUrl(null);
@@ -107,6 +110,7 @@ export default function TaskDetailPage() {
       const taker =
         task!.taker !== zeroAddress ? task!.taker : undefined;
       const row = await fetchTaskAnswer(task!.id.toString(), taker);
+      if (cancelled) return;
       const text = row?.answer_text?.trim() ?? "";
       setAnswerText(text);
       setSavedAnswerText(text);
@@ -114,7 +118,10 @@ export default function TaskDetailPage() {
     }
 
     void loadAnswer();
-  }, [task]);
+    return () => {
+      cancelled = true;
+    };
+  }, [task?.id, task?.taker]);
 
   const evidencePhotos = useMemo(() => {
     const removed = new Set(removedPhotoKeys);
@@ -200,44 +207,30 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function handleSaveAnswer() {
-    if (!taskPayAvailable || !address || !task) return;
-    if (!isTaker || task.status !== TaskStatus.Taken) return;
-
+  async function persistAnswerIfNeeded(): Promise<void> {
     const trimmed = answerText.trim();
-    if (!trimmed) {
-      alert("Write an answer or add a photo before completing.");
+    if (!trimmed || !address || !task) return;
+
+    if (DEMO_STORAGE_MODE) {
+      demoSaveTaskAnswer(taskId, address, trimmed);
+      setSavedAnswerText(trimmed);
       return;
     }
 
-    setSavingAnswer(true);
-    setStatusMsg("Saving answer…");
-    try {
-      if (DEMO_STORAGE_MODE) {
-        demoSaveTaskAnswer(taskId, address, trimmed);
-        setSavedAnswerText(trimmed);
-      } else {
-        const { answerUrl: url } = await saveTaskAnswer(
-          task.id.toString(),
-          address,
-          trimmed
-        );
-        setSavedAnswerText(trimmed);
-        setAnswerUrl(url);
-      }
-      setStatusMsg("Answer saved.");
-    } catch (err) {
-      console.error(err);
-      const message =
-        err instanceof Error ? err.message : "Could not save answer.";
-      setStatusMsg(message);
-      alert(message);
-    } finally {
-      setSavingAnswer(false);
-    }
+    if (trimmed === savedAnswerText && answerUrl) return;
+
+    const { answerUrl: url } = await saveTaskAnswer(
+      task.id.toString(),
+      address,
+      trimmed
+    );
+    setSavedAnswerText(trimmed);
+    setAnswerUrl(url);
   }
 
   async function resolvePrimaryEvidenceUrl(): Promise<string> {
+    await persistAnswerIfNeeded();
+
     if (evidencePhotos[0]) return evidencePhotos[0];
 
     const trimmed = answerText.trim();
@@ -246,21 +239,7 @@ export default function TaskDetailPage() {
     }
 
     if (DEMO_STORAGE_MODE) {
-      demoSaveTaskAnswer(taskId, address!, trimmed);
-      setSavedAnswerText(trimmed);
       return `demo-answer://${taskId}`;
-    }
-
-    if (trimmed !== savedAnswerText || !answerUrl) {
-      const { answerUrl: url } = await saveTaskAnswer(
-        task!.id.toString(),
-        address!,
-        trimmed
-      );
-      setSavedAnswerText(trimmed);
-      setAnswerUrl(url);
-      if (!url) throw new Error("Could not store answer.");
-      return url;
     }
 
     if (!answerUrl) throw new Error("Could not store answer.");
@@ -275,6 +254,7 @@ export default function TaskDetailPage() {
     }
 
     try {
+      setCompleting(true);
       setStatusMsg("Completing task on-chain…");
       const primaryUrl = await resolvePrimaryEvidenceUrl();
       const hash = await completeTask(taskId, primaryUrl);
@@ -293,6 +273,8 @@ export default function TaskDetailPage() {
       alert(
         "Could not complete task. Check you have USDC or another stablecoin for network fees."
       );
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -371,7 +353,8 @@ export default function TaskDetailPage() {
 
   const editableEvidence =
     Boolean(isTaker && task.status === TaskStatus.Taken);
-  const busy = isPending || savingAnswer;
+  const actionBusy = isPending || completing;
+  const inputLocked = uploading || completing || Boolean(deletingUrl);
   const hasEvidence = evidencePhotos.length > 0;
   const showAnswerCard =
     Boolean(savedAnswerText) &&
@@ -529,7 +512,7 @@ export default function TaskDetailPage() {
       {isTaker && task.status === TaskStatus.Taken && (
         <>
           <EvidenceUploadButton
-            disabled={uploading || busy}
+            disabled={inputLocked || actionBusy}
             uploading={uploading}
             statusMsg={uploading ? statusMsg : null}
             onFileSelected={handleEvidenceUpload}
@@ -554,7 +537,7 @@ export default function TaskDetailPage() {
             <textarea
               id="task-answer"
               className="input-field min-h-[100px] resize-none py-3"
-              disabled={busy}
+              disabled={inputLocked}
               placeholder="e.g. The correct phone number is 300 123 4567"
               maxLength={500}
               value={answerText}
@@ -563,27 +546,16 @@ export default function TaskDetailPage() {
             <p className="text-xs text-muted-foreground">
               {answerText.length}/500
             </p>
-            {answerText.trim() !== savedAnswerText && (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full rounded-xl font-bold"
-                disabled={busy || !answerText.trim()}
-                onClick={() => void handleSaveAnswer()}
-              >
-                {savingAnswer ? "Saving…" : "Save answer"}
-              </Button>
-            )}
           </div>
 
           <Button
             type="button"
             className="h-14 w-full gap-2 rounded-2xl text-base font-bold shadow-glow"
-            disabled={busy || !canComplete}
+            disabled={inputLocked || actionBusy || !canComplete}
             onClick={handleMarkComplete}
           >
             <CheckCircle2 className="h-5 w-5" />
-            {busy ? "Processing…" : "Mark task complete"}
+            {actionBusy ? "Processing…" : "Mark task complete"}
           </Button>
         </>
       )}
@@ -601,15 +573,15 @@ export default function TaskDetailPage() {
         <div className="grid gap-3">
           <Button
             className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"
-            disabled={busy}
+            disabled={actionBusy}
             onClick={() => handleApprove()}
           >
-            {busy ? "Processing…" : "Approve & pay"}
+            {actionBusy ? "Processing…" : "Approve & pay"}
           </Button>
           <Button
             variant="outline"
             className="h-12 w-full rounded-2xl border-red-500/40 bg-red-500/10 text-base font-bold text-red-400 hover:bg-red-500/20"
-            disabled={busy}
+            disabled={actionBusy}
             onClick={() => handleReject()}
           >
             Reject (refund COPm)
@@ -626,7 +598,7 @@ export default function TaskDetailPage() {
           </p>
           <Button
             className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"
-            disabled={busy}
+            disabled={actionBusy}
             onClick={async () => {
               try {
                 await approveTask(taskId, true);
@@ -636,12 +608,12 @@ export default function TaskDetailPage() {
               }
             }}
           >
-            {busy ? "Processing…" : "Approve & pay"}
+            {actionBusy ? "Processing…" : "Approve & pay"}
           </Button>
           <Button
             variant="outline"
             className="h-12 w-full rounded-2xl border-red-500/40 bg-red-500/10 text-base font-bold text-red-400 hover:bg-red-500/20"
-            disabled={busy}
+            disabled={actionBusy}
             onClick={async () => {
               if (!confirm("Reject this work? COPm returns to the demo poster."))
                 return;
@@ -668,7 +640,7 @@ export default function TaskDetailPage() {
         <Button
           variant="outline"
           className="w-full h-12 rounded-2xl border-border bg-muted text-foreground hover:bg-muted/80"
-          disabled={busy}
+          disabled={actionBusy}
           onClick={handleCancel}
         >
           Cancel task (refund COPm)
