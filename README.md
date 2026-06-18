@@ -7,10 +7,10 @@ Built for [Agentes Onchain Colombia](https://hackathon.celocolombia.org/) — De
 ## Features
 
 - **COPm escrow** — rewards held in `TaskPay.sol` until approval
-- **Fee abstraction** — MiniPay pays gas in USDC (no CELO required)
+- **Fee abstraction** — MiniPay pays gas in USDC (no CELO required for users)
 - **Auto-connect** — no Connect Wallet button inside MiniPay
 - **Photo evidence** — Supabase storage (no gas); URL anchored onchain at complete
-- **Welcome USDm** — optional 0.5 USDm for new wallets (backup stablecoin for fees)
+- **Welcome USDC** — new wallets receive **1 USDC** once for network fees
 - **Mobile-first** — single column, bottom nav, English UI
 
 ## Stack
@@ -24,7 +24,7 @@ Built for [Agentes Onchain Colombia](https://hackathon.celocolombia.org/) — De
 
 ```bash
 pnpm install
-cp .env.example apps/web/.env.local
+cp apps/web/.env.template apps/web/.env.local
 # Set NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA after deploy
 
 pnpm dev
@@ -42,40 +42,62 @@ Set `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` in `apps/web/.env.local`.
 
 Current Sepolia deploy (with `completeTask`): `0x7c9F688C05dcb2f2311cB296dE2D8f1842f8A47A`
 
-## Fund wallets (deployer on PC)
+## Fund wallets for testing
 
-`taskpay/.env` needs `PRIVATE_KEY` (deployer). Optional `MINIPAY_ADDRESS` for the default MiniPay phone.
+`taskpay/.env` needs `PRIVATE_KEY` (deployer) and `MINIPAY_ADDRESS` (your MiniPay phone wallet).
+
+### Gas (USDC) — MiniPay users
+
+1. [Circle faucet](https://faucet.circle.com/) → select **Celo Sepolia** → your MiniPay address  
+   Or enable **Welcome USDC** in production (see below).
+
+### Task rewards (COPm) — MiniPay users
+
+From your PC (deployer needs **USDC + CELO** on Sepolia):
+
+```bash
+# 1. Circle faucet → deployer address (USDC)
+# 2. CELO faucet → deployer (https://faucet.celo.org/celo-sepolia)
+# 3. Swap USDC → COPm and send to MiniPay:
+pnpm fund:copm 10 3000
+#        ^USDC   ^COPm amount to send
+```
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm fund:swap [usdc] [usdm]` | Swap USDC → USDm on deployer (treasury) |
-| `pnpm fund:welcome <0xAddress> [0.5]` | Send USDm directly (2nd phone / manual) |
-| `pnpm fund:minipay` | Swap + send USDm to `MINIPAY_ADDRESS` |
+| `pnpm fund:copm [usdc] [copm]` | Swap USDC → COPm via Mento, send COPm to `MINIPAY_ADDRESS` |
+| `pnpm fund:usdc <0xAddress> [1]` | Send USDC directly (second phone / manual) |
 
-Deployer pays gas in CELO; users pay tx fees in **USDC** via MiniPay. Takers earn **COPm** rewards.
+**In MiniPay:** you can also swap USDC → COPm inside the wallet (Mento) if you already have USDC.
 
-## Welcome faucet (automatic)
+## Welcome faucet (automatic, production)
 
-On first connect, the app calls `POST /api/welcome-usdm` to send **0.5 USDm** once per wallet.
+On first connect, the app calls `POST /api/welcome-usdc` to send **1 USDC** once per wallet.
 
-Server env in `apps/web` (Vercel + `.env.local`):
+**Vercel / `.env.local` (server-only):**
 
-- `WELCOME_FUNDER_PRIVATE_KEY` — deployer private key (never `NEXT_PUBLIC_`)
-- Run `welcome_claims` section in `supabase/setup.sql`
+| Variable | Description |
+|----------|-------------|
+| `WELCOME_FUNDER_PRIVATE_KEY` | Deployer private key — must hold **USDC + CELO** (gas for the transfer) |
+| `NEXT_PUBLIC_SUPABASE_URL` | For `welcome_claims` dedup table |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Same project |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional, recommended |
+
+Run `welcome_claims` section in `supabase/setup.sql`.
+
+If `WELCOME_FUNDER_PRIVATE_KEY` is unset, the welcome banner is skipped and users fund via Circle faucet.
 
 ## Supabase
 
 1. Create project at [supabase.com](https://supabase.com)
 2. Run `supabase/setup.sql`
-3. Create public bucket `task-evidence`
-4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Set `NEXT_PUBLIC_SUPABASE_URL` (base URL, **no** `/rest/v1/`) and anon key
 
 ## Test in MiniPay
 
 1. Enable Developer Mode + Use Testnet in MiniPay
-2. `pnpm dev` + `ngrok http 3000`
-3. Load ngrok URL via Load Test Page
-4. Run full flow with 2–3 wallets (5+ txs for hackathon rubric)
+2. Open your Vercel production URL (or ngrok for local)
+3. Run full flow: post → take → photo → complete → approve
 
 ## Deploy frontend (Vercel)
 
@@ -85,10 +107,10 @@ Env vars:
 
 - `NEXT_PUBLIC_TASKPAY_ADDRESS_SEPOLIA` — `0x7c9F688C05dcb2f2311cB296dE2D8f1842f8A47A`
 - `NEXT_PUBLIC_DEMO_STORAGE_MODE=false`
-- `NEXT_PUBLIC_SUPABASE_URL` — `https://YOUR-PROJECT.supabase.co` (no `/rest/v1/`)
+- `NEXT_PUBLIC_SUPABASE_URL` — `https://YOUR-PROJECT.supabase.co`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `WELCOME_FUNDER_PRIVATE_KEY` (server-only, optional welcome faucet)
-- `SUPABASE_SERVICE_ROLE_KEY` (optional, recommended for evidence uploads)
+- `WELCOME_FUNDER_PRIVATE_KEY` (server-only)
+- `SUPABASE_SERVICE_ROLE_KEY` (optional)
 
 ## Pitch
 

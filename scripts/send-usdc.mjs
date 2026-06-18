@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Send USDm directly to a wallet (welcome faucet / second phone).
- * Requires: PRIVATE_KEY in taskpay/.env
- * Usage: node scripts/send-welcome-usdm.mjs <recipient> [amount]
- * Example: pnpm fund:welcome 0xAB67... 0.5
+ * Send USDC on Celo Sepolia (gas money for a wallet).
+ * Requires: PRIVATE_KEY in taskpay/.env (deployer with USDC + CELO for gas)
+ *
+ * Usage: pnpm fund:usdc <0xRecipient> [amount]
+ * Example: pnpm fund:usdc 0xAB67... 1
  */
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
@@ -21,7 +22,7 @@ const env = Object.fromEntries(
     })
 );
 
-const USDm = "0xdE9e4C3ce781b4bA68120d6261cbad65ce0aB00b";
+const USDC = "0x01C5C0122039549AD1493B8220cABEdD739BC44E";
 const RPC = "https://forno.celo-sepolia.celo-testnet.org";
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
@@ -29,32 +30,32 @@ const ERC20_ABI = [
 ];
 
 const recipient = process.argv[2];
-const amountHuman = process.argv[3] ?? "0.5";
+const amountHuman = process.argv[3] ?? "1";
 
 async function main() {
   if (!env.PRIVATE_KEY) {
     throw new Error("Set PRIVATE_KEY in taskpay/.env");
   }
   if (!recipient || !/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
-    throw new Error("Usage: send-welcome-usdm.mjs <0xRecipient> [amount]");
+    throw new Error("Usage: fund:usdc <0xRecipient> [amountUSDC]");
   }
 
   const provider = new ethers.providers.JsonRpcProvider(RPC);
   const signer = new ethers.Wallet(env.PRIVATE_KEY, provider);
-  const usdm = new ethers.Contract(USDm, ERC20_ABI, signer);
-  const amount = ethers.utils.parseUnits(amountHuman, 18);
+  const usdc = new ethers.Contract(USDC, ERC20_ABI, signer);
+  const amount = ethers.utils.parseUnits(amountHuman, 6);
 
-  const bal = await usdm.balanceOf(signer.address);
+  const bal = await usdc.balanceOf(signer.address);
   console.log(`Deployer ${signer.address}`);
-  console.log(`USDm balance: ${ethers.utils.formatUnits(bal, 18)}`);
+  console.log(`USDC balance: ${ethers.utils.formatUnits(bal, 6)}`);
   if (bal.lt(amount)) {
     throw new Error(
-      `Insufficient USDm. Run pnpm fund:swap first or send USDC to deployer.`
+      "Insufficient USDC on deployer. Fund via https://faucet.circle.com/ (Celo Sepolia)."
     );
   }
 
-  const tx = await usdm.transfer(recipient, amount);
-  console.log(`Sending ${amountHuman} USDm to ${recipient}`);
+  const tx = await usdc.transfer(recipient, amount);
+  console.log(`Sending ${amountHuman} USDC to ${recipient}`);
   console.log("Tx:", tx.hash);
   await tx.wait();
   console.log("Done.");

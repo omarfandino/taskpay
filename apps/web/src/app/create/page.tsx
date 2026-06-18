@@ -93,26 +93,27 @@ export default function CreatePage() {
       }
 
       setStatus("Posting task…");
-      const hash = await postTask(
+      const result = await postTask(
         description.trim(),
         finalLocation,
         deadline,
         rewardAmount
       );
 
-      if (hash === "demo-simulated") {
+      if (!result) return;
+
+      if (result.simulated) {
         setSimulated(true);
         setLastTx(null);
-      } else if (hash) {
+      } else if (result.hash) {
         setSimulated(false);
-        setLastTx(hash);
+        setLastTx(result.hash);
       }
 
-      setStatus("Task posted!");
       setDescription("");
       setReward("");
       setLocation("");
-      router.push("/");
+      router.push("/my-tasks");
     } catch (err) {
       console.error(err);
       setStatus("Failed. Try again.");

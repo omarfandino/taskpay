@@ -1,13 +1,14 @@
 import { parseUnits } from "viem";
 import { CHAIN_IDS, TOKEN_ADDRESSES } from "./constants";
 
-export const WELCOME_USDM_AMOUNT = parseUnits("0.5", 18);
+/** One-time welcome transfer for new wallets (network fees). */
+export const WELCOME_USDC_AMOUNT = parseUnits("1", 6);
 
 export const CELO_SEPOLIA_RPC =
   "https://forno.celo-sepolia.celo-testnet.org";
 
-export function getWelcomeUsdmAddress(): `0x${string}` {
-  return TOKEN_ADDRESSES[CHAIN_IDS.celoSepolia].usdm;
+export function getWelcomeUsdcAddress(): `0x${string}` {
+  return TOKEN_ADDRESSES[CHAIN_IDS.celoSepolia].usdc;
 }
 
 export function normalizeWalletAddress(address: string): `0x${string}` {

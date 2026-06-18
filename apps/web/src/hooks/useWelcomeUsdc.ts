@@ -12,7 +12,7 @@ type WelcomeStatus =
   | "error"
   | "skipped";
 
-export function useWelcomeUsdm() {
+export function useWelcomeUsdc() {
   const { address, mounted } = useMiniPay();
   const [status, setStatus] = useState<WelcomeStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export function useWelcomeUsdm() {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/welcome-usdm", {
+      const response = await fetch("/api/welcome-usdc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: wallet }),
@@ -37,7 +37,7 @@ export function useWelcomeUsdm() {
 
       if (!response.ok) {
         setStatus("error");
-        setMessage(payload.error || "Could not send welcome USDm.");
+        setMessage(payload.error || "Could not send welcome USDC.");
         return;
       }
 
@@ -48,7 +48,7 @@ export function useWelcomeUsdm() {
 
       setStatus("sent");
       setMessage(
-        `You received ${payload.amount ?? "0.5"} USDm to cover network fees.`
+        `You received ${payload.amount ?? "1"} USDC to cover network fees.`
       );
     } catch {
       setStatus("error");

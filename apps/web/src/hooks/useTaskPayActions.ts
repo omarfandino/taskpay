@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { decodeEventLog } from "viem";
 import {
   usePublicClient,
   useReadContract,
@@ -26,6 +27,12 @@ import {
   demoTakeTask,
   simulateTxDelay,
 } from "@/lib/demo-store";
+
+export type PostTaskResult = {
+  hash: string | null;
+  taskId?: bigint;
+  simulated: boolean;
+};
 
 export function useCopmAllowance(rewardAmount: bigint): {
   needsApproval: boolean;
@@ -107,17 +114,18 @@ export function useTaskPayActions() {
       location: string,
       deadline: bigint,
       reward: bigint
-    ): Promise<string | null> => {
+    ): Promise<PostTaskResult | null> => {
       if (!address) return null;
 
       if (DEMO_STORAGE_MODE) {
-        await runDemo(() =>
-          demoPostTask(address, description, location, deadline, reward)
-        );
-        return "demo-simulated";
+        let taskId = 0n;
+        await runDemo(() => {
+          taskId = demoPostTask(address, description, location, deadline, reward);
+        });
+        return { hash: null, taskId, simulated: true };
       }
 
-      if (!taskPayAddress) return null;
+      if (!taskPayAddress || !publicClient) return null;
 
       const hash = await writeContractAsync({
         address: taskPayAddress,
@@ -127,10 +135,38 @@ export function useTaskPayActions() {
         ...feeCurrencyFor(),
       });
       setSimulatedTx(false);
-      await waitForReceipt(hash);
-      return hash;
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      await invalidateTaskReads();
+
+      let taskId: bigint | undefined;
+      for (const log of receipt.logs) {
+        if (log.address.toLowerCase() !== taskPayAddress.toLowerCase()) continue;
+        try {
+          const decoded = decodeEventLog({
+            abi: taskPayAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "TaskPosted") {
+            taskId = decoded.args.taskId as bigint;
+            break;
+          }
+        } catch {
+          // not TaskPosted
+        }
+      }
+
+      return { hash, taskId, simulated: false };
     },
-    [address, chainId, runDemo, taskPayAddress, waitForReceipt, writeContractAsync]
+    [
+      address,
+      invalidateTaskReads,
+      publicClient,
+      runDemo,
+      taskPayAddress,
+      writeContractAsync,
+    ]
   );
 
   const approveCopm = useCallback(

@@ -1,5 +1,15 @@
 export const taskPayAbi = [
   {
+    type: "event",
+    name: "TaskPosted",
+    inputs: [
+      { name: "taskId", type: "uint256", indexed: true },
+      { name: "poster", type: "address", indexed: true },
+      { name: "reward", type: "uint256", indexed: false },
+      { name: "deadline", type: "uint256", indexed: false },
+    ],
+  },
+  {
     type: "function",
     name: "postTask",
     inputs: [

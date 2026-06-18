@@ -9,10 +9,10 @@ import { privateKeyToAccount } from "viem/accounts";
 import { celoSepolia } from "viem/chains";
 import {
   CELO_SEPOLIA_RPC,
-  WELCOME_USDM_AMOUNT,
-  getWelcomeUsdmAddress,
+  WELCOME_USDC_AMOUNT,
+  getWelcomeUsdcAddress,
   normalizeWalletAddress,
-} from "@/lib/welcome-usdm";
+} from "@/lib/welcome-faucet";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const erc20TransferAbi = parseAbi([
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   }
 
   const account = privateKeyToAccount(funderKey as `0x${string}`);
-  const usdmAddress = getWelcomeUsdmAddress();
+  const usdcAddress = getWelcomeUsdcAddress();
 
   const publicClient = createPublicClient({
     chain: celoSepolia,
@@ -83,11 +83,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const hash = await walletClient.writeContract({
-      address: usdmAddress,
+      address: usdcAddress,
       abi: erc20TransferAbi,
       functionName: "transfer",
-      args: [recipient, WELCOME_USDM_AMOUNT],
-      feeCurrency: usdmAddress,
+      args: [recipient, WELCOME_USDC_AMOUNT],
     });
 
     await publicClient.waitForTransactionReceipt({ hash });
@@ -95,7 +94,7 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabase.from("welcome_claims").insert({
       address: recipient,
       tx_hash: hash,
-      amount_wei: WELCOME_USDM_AMOUNT.toString(),
+      amount_wei: WELCOME_USDC_AMOUNT.toString(),
     });
 
     if (insertError) {
@@ -105,10 +104,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       status: "sent",
       txHash: hash,
-      amount: "0.5",
+      amount: "1",
+      token: "USDC",
     });
   } catch (err) {
-    console.error("welcome-usdm transfer failed:", err);
+    console.error("welcome-usdc transfer failed:", err);
     const message =
       err instanceof Error ? err.message : "Transfer failed.";
     return NextResponse.json({ error: message }, { status: 502 });
