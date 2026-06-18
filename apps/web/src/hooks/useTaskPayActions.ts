@@ -12,6 +12,7 @@ import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { feeCurrencyFor, getCopmAddress } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskPayAddress } from "@/hooks/useTaskPayAddress";
+import { useInvalidateTaskPayReads } from "@/hooks/useInvalidateTaskPayReads";
 import {
   demoApproveTask,
   demoCancelTask,
@@ -68,6 +69,7 @@ export function useTaskPayActions() {
   const taskPayAddress = useTaskPayAddress();
   const copmAddress = getCopmAddress(chainId);
   const publicClient = usePublicClient({ chainId });
+  const invalidateTaskReads = useInvalidateTaskPayReads();
 
   const { writeContractAsync, data: txHash, isPending } = useWriteContract();
   const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
@@ -83,8 +85,9 @@ export function useTaskPayActions() {
         throw new Error("Network client not ready. Try again.");
       }
       await publicClient.waitForTransactionReceipt({ hash });
+      await invalidateTaskReads();
     },
-    [publicClient]
+    [invalidateTaskReads, publicClient]
   );
 
   const runDemo = useCallback(async (fn: () => void) => {

@@ -24,6 +24,7 @@ export default function FeedPage() {
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [locating, setLocating] = useState(false);
   const [takingId, setTakingId] = useState<bigint | null>(null);
+  const [takenTaskIds, setTakenTaskIds] = useState<Set<string>>(() => new Set());
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [simulated, setSimulated] = useState(false);
 
@@ -31,11 +32,14 @@ export default function FeedPage() {
   const { takeTask, isPending } = useTaskPayActions();
 
   const tasks: Task[] = useMemo(() => {
+    const visible = openTasks.filter(
+      (task) => !takenTaskIds.has(task.id.toString())
+    );
     if (filter === "nearby" && userLocation) {
-      return sortByDistance(openTasks, userLocation);
+      return sortByDistance(visible, userLocation);
     }
-    return openTasks;
-  }, [openTasks, filter, userLocation]);
+    return visible;
+  }, [openTasks, filter, userLocation, takenTaskIds]);
 
   async function handleNearby() {
     setLocating(true);
@@ -55,9 +59,12 @@ export default function FeedPage() {
       alert("Connect a wallet first (MetaMask or MiniPay).");
       return;
     }
+    const taskKey = taskId.toString();
     setTakingId(taskId);
     try {
       const hash = await takeTask(taskId);
+      setTakenTaskIds((prev) => new Set(prev).add(taskKey));
+      await refetch();
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
@@ -66,8 +73,12 @@ export default function FeedPage() {
         setSimulated(false);
         setLastTx(hash);
       }
-      refetch();
     } catch (err) {
+      setTakenTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskKey);
+        return next;
+      });
       console.error(err);
       alert("Failed to take task. Check your balance and try again.");
     } finally {

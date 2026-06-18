@@ -40,7 +40,11 @@ export function useOpenTasks(): {
     address: taskPayAddress,
     abi: taskPayAbi,
     functionName: "getOpenTasks",
-    query: { enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress) },
+    query: {
+      enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress),
+      staleTime: 0,
+      refetchOnMount: "always",
+    },
   });
 
   const demoTasks = useMemo(() => {
@@ -81,7 +85,11 @@ export function useTaskById(taskId: bigint): {
     abi: taskPayAbi,
     functionName: "getTask",
     args: [taskId],
-    query: { enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress) },
+    query: {
+      enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress),
+      staleTime: 0,
+      refetchOnMount: "always",
+    },
   });
 
   const demoTask = useMemo(() => {
@@ -110,12 +118,20 @@ export function useMyTasks(address: `0x${string}` | undefined): {
   const taskPayAddress = useTaskPayAddress();
   const version = useDemoStoreVersion();
 
+  const taskQuery = {
+    staleTime: 0,
+    refetchOnMount: "always" as const,
+  };
+
   const { data: postedRaw, isLoading: loadingPosted } = useReadContract({
     address: taskPayAddress,
     abi: taskPayAbi,
     functionName: "getTasksByPoster",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress && address) },
+    query: {
+      enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress && address),
+      ...taskQuery,
+    },
   });
 
   const { data: takenRaw, isLoading: loadingTaken } = useReadContract({
@@ -123,7 +139,10 @@ export function useMyTasks(address: `0x${string}` | undefined): {
     abi: taskPayAbi,
     functionName: "getTasksByTaker",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress && address) },
+    query: {
+      enabled: Boolean(!DEMO_STORAGE_MODE && taskPayAddress && address),
+      ...taskQuery,
+    },
   });
 
   const demoPosted = useMemo(() => {
