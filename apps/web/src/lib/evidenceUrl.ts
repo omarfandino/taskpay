@@ -18,3 +18,21 @@ export function evidenceUrlsMatch(a: string, b: string): boolean {
     return false;
   }
 }
+
+/** Stable key for dedupe / hidden-set lookups */
+export function evidenceUrlKey(url: string): string {
+  return evidenceStoragePath(url) ?? url;
+}
+
+export function dedupeEvidenceUrls(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const url of urls) {
+    if (!url) continue;
+    const key = evidenceUrlKey(url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(url);
+  }
+  return result;
+}

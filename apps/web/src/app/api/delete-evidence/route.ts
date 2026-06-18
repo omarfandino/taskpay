@@ -38,34 +38,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: selectError.message }, { status: 502 });
   }
 
-  const row = (rows ?? []).find((r) =>
+  const matchingRows = (rows ?? []).filter((r) =>
     evidenceUrlsMatch(r.photo_url as string, photoUrl)
   );
 
-  if (!row) {
+  if (matchingRows.length === 0) {
     return NextResponse.json(
       { error: "Photo not found or you cannot remove it." },
       { status: 404 }
     );
   }
 
-  const storedUrl = row.photo_url as string;
+  const ids = matchingRows.map((r) => r.id as number);
 
   const { error: deleteRowError } = await supabase
     .from("evidence_photos")
     .delete()
-    .eq("id", row.id);
+    .in("id", ids);
 
   if (deleteRowError) {
     return NextResponse.json({ error: deleteRowError.message }, { status: 502 });
   }
 
-  const storagePath =
-    evidenceStoragePath(storedUrl) ?? evidenceStoragePath(photoUrl);
-  if (storagePath) {
+  const storagePaths = new Set<string>();
+  for (const row of matchingRows) {
+    const storedUrl = row.photo_url as string;
+    const path =
+      evidenceStoragePath(storedUrl) ?? evidenceStoragePath(photoUrl);
+    if (path) storagePaths.add(path);
+  }
+
+  if (storagePaths.size > 0) {
     const { error: storageError } = await supabase.storage
       .from("task-evidence")
-      .remove([storagePath]);
+      .remove([...storagePaths]);
     if (storageError) {
       console.warn("evidence storage delete failed:", storageError.message);
     }

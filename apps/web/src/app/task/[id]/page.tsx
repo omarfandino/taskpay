@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -22,7 +22,11 @@ import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
 import { Countdown, StatusBadge, TaskStatusPanel } from "@/components/task-utils";
 import { uploadEvidencePhoto } from "@/lib/uploadEvidence";
 import { fetchEvidencePhotos, deleteEvidencePhoto } from "@/lib/evidencePhotos";
-import { evidenceUrlsMatch } from "@/lib/evidenceUrl";
+import {
+  dedupeEvidenceUrls,
+  evidenceUrlKey,
+  evidenceUrlsMatch,
+} from "@/lib/evidenceUrl";
 import { getDemoEvidenceUrls } from "@/lib/demo-store";
 import { Button } from "@/components/ui/button";
 import { zeroAddress } from "viem";
@@ -39,8 +43,10 @@ export default function TaskDetailPage() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [remotePhotos, setRemotePhotos] = useState<string[]>([]);
   const [photosVersion, setPhotosVersion] = useState(0);
+  const [removedPhotoKeys, setRemovedPhotoKeys] = useState<string[]>([]);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
   const [confirmDeleteUrl, setConfirmDeleteUrl] = useState<string | null>(null);
+  const photosLoadIdRef = useRef(0);
 
   const { task, refetch } = useTaskById(taskId);
   const {
@@ -62,6 +68,8 @@ export default function TaskDetailPage() {
   useEffect(() => {
     if (!task) return;
 
+    const loadId = ++photosLoadIdRef.current;
+
     async function loadPhotos() {
       const taker =
         task!.taker !== zeroAddress ? task!.taker : undefined;
@@ -69,7 +77,9 @@ export default function TaskDetailPage() {
         await fetchEvidencePhotos(task!.id.toString(), taker)
       ).map((p) => p.photo_url);
       const fromDemo = DEMO_STORAGE_MODE ? getDemoEvidenceUrls(task!.id) : [];
-      const merged = [...new Set([...fromDemo, ...fromSupabase])];
+      const merged = dedupeEvidenceUrls([...fromDemo, ...fromSupabase]);
+
+      if (loadId !== photosLoadIdRef.current) return;
       setRemotePhotos(merged);
     }
 
@@ -77,12 +87,13 @@ export default function TaskDetailPage() {
   }, [task, photosVersion]);
 
   const evidencePhotos = useMemo(() => {
-    const urls = [...remotePhotos];
-    if (task?.evidenceUrl && !urls.includes(task.evidenceUrl)) {
-      urls.push(task.evidenceUrl);
-    }
-    return urls;
-  }, [remotePhotos, task?.evidenceUrl]);
+    const removed = new Set(removedPhotoKeys);
+    const merged = dedupeEvidenceUrls([
+      ...remotePhotos,
+      ...(task?.evidenceUrl ? [task.evidenceUrl] : []),
+    ]);
+    return merged.filter((url) => !removed.has(evidenceUrlKey(url)));
+  }, [remotePhotos, task?.evidenceUrl, removedPhotoKeys]);
 
   async function handleEvidenceUpload(file: File) {
     if (!taskPayAvailable || !address || !task) {
@@ -137,10 +148,13 @@ export default function TaskDetailPage() {
       } else {
         await deleteEvidencePhoto(task.id.toString(), address, photoUrl);
       }
+      const removedKey = evidenceUrlKey(photoUrl);
+      setRemovedPhotoKeys((prev) =>
+        prev.includes(removedKey) ? prev : [...prev, removedKey]
+      );
       setRemotePhotos((prev) =>
         prev.filter((url) => !evidenceUrlsMatch(url, photoUrl))
       );
-      setPhotosVersion((v) => v + 1);
       setStatusMsg("Photo removed.");
     } catch (err) {
       console.error(err);
@@ -334,15 +348,19 @@ export default function TaskDetailPage() {
           </p>
           <div className="grid grid-cols-2 gap-3">
             {evidencePhotos.map((url) => {
+              const photoKey = evidenceUrlKey(url);
               const canDelete =
                 editableEvidence &&
                 (!task.evidenceUrl ||
                   !evidenceUrlsMatch(task.evidenceUrl, url));
-              const isConfirming = confirmDeleteUrl === url;
-              const isDeleting = deletingUrl === url;
+              const isConfirming =
+                confirmDeleteUrl !== null &&
+                evidenceUrlsMatch(confirmDeleteUrl, url);
+              const isDeleting =
+                deletingUrl !== null && evidenceUrlsMatch(deletingUrl, url);
 
               return (
-                <div key={url} className="relative">
+                <div key={photoKey} className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={url}
