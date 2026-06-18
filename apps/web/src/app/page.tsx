@@ -12,6 +12,8 @@ import { LowBalanceNotice } from "@/components/MiniPayGuard";
 import { SegmentTabs } from "@/components/SegmentTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { getCurrentPosition, sortByDistance, LatLng } from "@/lib/geo";
+import { useRefreshTaskPayViewsAfterTx } from "@/hooks/useInvalidateTaskPayReads";
+import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
 import { getExplorerUrl } from "@/lib/constants";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 
@@ -30,6 +32,8 @@ export default function FeedPage() {
 
   const { tasks: openTasks, isLoading, refetch } = useOpenTasks();
   const { takeTask, isPending } = useTaskPayActions();
+
+  useTaskPayViewRefreshOnMount(taskPayAvailable);
 
   const tasks: Task[] = useMemo(() => {
     const visible = openTasks.filter(
@@ -64,6 +68,8 @@ export default function FeedPage() {
     try {
       const hash = await takeTask(taskId);
       setTakenTaskIds((prev) => new Set(prev).add(taskKey));
+      await refetch();
+      await new Promise((resolve) => setTimeout(resolve, 900));
       await refetch();
       if (hash === "demo-simulated") {
         setSimulated(true);

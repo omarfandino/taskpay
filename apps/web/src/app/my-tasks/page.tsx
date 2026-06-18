@@ -9,12 +9,16 @@ import { PageHeader } from "@/components/PageHeader";
 import { SegmentTabs } from "@/components/SegmentTabs";
 import { EmptyState } from "@/components/EmptyState";
 
+import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
+
 type Tab = "posted" | "taken";
 
 export default function MyTasksPage() {
   const { address, isMiniPay, mounted } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
   const [tab, setTab] = useState<Tab>("posted");
+
+  useTaskPayViewRefreshOnMount(Boolean(address && taskPayAvailable));
 
   const { posted, taken, isLoadingPosted, isLoadingTaken } = useMyTasks(address);
 

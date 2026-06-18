@@ -28,6 +28,8 @@ import {
   evidenceUrlsMatch,
   isAnswerEvidenceUrl,
 } from "@/lib/evidenceUrl";
+import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
+import { useRefreshTaskPayViewsAfterTx } from "@/hooks/useInvalidateTaskPayReads";
 import { fetchTaskAnswer, saveTaskAnswer } from "@/lib/taskAnswers";
 import { getDemoEvidenceUrls } from "@/lib/demo-store";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,9 @@ export default function TaskDetailPage() {
   const taskId = BigInt(params.id as string);
   const { address, chainId } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
+  const refreshViewsAfterTx = useRefreshTaskPayViewsAfterTx();
+
+  useTaskPayViewRefreshOnMount(taskPayAvailable);
 
   const [uploading, setUploading] = useState(false);
   const [lastTx, setLastTx] = useState<string | null>(null);
@@ -272,6 +277,7 @@ export default function TaskDetailPage() {
         setLastTx(hash);
       }
       setStatusMsg("Task submitted for review!");
+      await refreshViewsAfterTx();
       refetch();
       router.push("/my-tasks");
     } catch (err) {
@@ -307,6 +313,7 @@ export default function TaskDetailPage() {
         setLastTx(hash);
       }
       refetch();
+      await refreshViewsAfterTx();
     } catch (err) {
       console.error(err);
       alert("Approval failed.");
@@ -326,6 +333,7 @@ export default function TaskDetailPage() {
         setLastTx(hash);
       }
       refetch();
+      await refreshViewsAfterTx();
       router.push("/my-tasks");
     } catch (err) {
       console.error(err);
@@ -354,6 +362,7 @@ export default function TaskDetailPage() {
         setLastTx(hash);
       }
       refetch();
+      await refreshViewsAfterTx();
       router.push("/my-tasks");
     } catch (err) {
       console.error(err);
