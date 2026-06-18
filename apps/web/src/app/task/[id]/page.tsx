@@ -22,6 +22,7 @@ import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
 import { Countdown, StatusBadge, TaskStatusPanel } from "@/components/task-utils";
 import { uploadEvidencePhoto } from "@/lib/uploadEvidence";
 import { fetchEvidencePhotos, deleteEvidencePhoto } from "@/lib/evidencePhotos";
+import { evidenceUrlsMatch } from "@/lib/evidenceUrl";
 import { getDemoEvidenceUrls } from "@/lib/demo-store";
 import { Button } from "@/components/ui/button";
 import { zeroAddress } from "viem";
@@ -39,6 +40,7 @@ export default function TaskDetailPage() {
   const [remotePhotos, setRemotePhotos] = useState<string[]>([]);
   const [photosVersion, setPhotosVersion] = useState(0);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
+  const [confirmDeleteUrl, setConfirmDeleteUrl] = useState<string | null>(null);
 
   const { task, refetch } = useTaskById(taskId);
   const {
@@ -119,19 +121,25 @@ export default function TaskDetailPage() {
   async function handleEvidenceDelete(photoUrl: string) {
     if (!taskPayAvailable || !address || !task) return;
     if (!isTaker || task.status !== TaskStatus.Taken) return;
-    if (task.evidenceUrl === photoUrl) {
+    if (
+      task.evidenceUrl &&
+      evidenceUrlsMatch(task.evidenceUrl, photoUrl)
+    ) {
       alert("This photo is already on-chain and cannot be removed.");
       return;
     }
-    if (!confirm("Remove this photo?")) return;
 
     setDeletingUrl(photoUrl);
+    setConfirmDeleteUrl(null);
     try {
       if (DEMO_STORAGE_MODE) {
         demoRemoveEvidence(taskId, address, photoUrl);
       } else {
         await deleteEvidencePhoto(task.id.toString(), address, photoUrl);
       }
+      setRemotePhotos((prev) =>
+        prev.filter((url) => !evidenceUrlsMatch(url, photoUrl))
+      );
       setPhotosVersion((v) => v + 1);
       setStatusMsg("Photo removed.");
     } catch (err) {
@@ -325,27 +333,73 @@ export default function TaskDetailPage() {
             Evidence photos ({evidencePhotos.length})
           </p>
           <div className="grid grid-cols-2 gap-3">
-            {evidencePhotos.map((url) => (
-              <div key={url} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt="Task evidence"
-                  className="aspect-square w-full rounded-xl border object-cover"
-                />
-                {editableEvidence && url !== task.evidenceUrl && (
-                  <button
-                    type="button"
-                    aria-label="Remove photo"
-                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm disabled:opacity-50"
-                    disabled={Boolean(deletingUrl)}
-                    onClick={() => void handleEvidenceDelete(url)}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
+            {evidencePhotos.map((url) => {
+              const canDelete =
+                editableEvidence &&
+                (!task.evidenceUrl ||
+                  !evidenceUrlsMatch(task.evidenceUrl, url));
+              const isConfirming = confirmDeleteUrl === url;
+              const isDeleting = deletingUrl === url;
+
+              return (
+                <div key={url} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt="Task evidence"
+                    className="aspect-square w-full rounded-xl border object-cover"
+                  />
+                  {canDelete && (
+                    <>
+                      {isConfirming ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/75 p-2">
+                          <p className="text-center text-xs font-semibold text-white">
+                            Remove photo?
+                          </p>
+                          <div className="flex w-full gap-2">
+                            <button
+                              type="button"
+                              className="min-h-[40px] flex-1 rounded-lg bg-red-500 text-sm font-bold text-white disabled:opacity-50"
+                              disabled={Boolean(deletingUrl)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleEvidenceDelete(url);
+                              }}
+                            >
+                              {isDeleting ? "…" : "Remove"}
+                            </button>
+                            <button
+                              type="button"
+                              className="min-h-[40px] flex-1 rounded-lg bg-white/20 text-sm font-bold text-white"
+                              disabled={Boolean(deletingUrl)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteUrl(null);
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label="Remove photo"
+                          className="absolute right-2 top-2 z-10 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-black/70 text-white shadow-lg disabled:opacity-50"
+                          disabled={Boolean(deletingUrl)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteUrl(url);
+                          }}
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

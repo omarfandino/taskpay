@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-
-function storagePathFromPublicUrl(photoUrl: string): string | null {
-  const marker = "/storage/v1/object/public/task-evidence/";
-  const index = photoUrl.indexOf(marker);
-  if (index === -1) return null;
-  return decodeURIComponent(photoUrl.slice(index + marker.length));
-}
+import { evidenceStoragePath, evidenceUrlsMatch } from "@/lib/evidenceUrl";
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabaseAdmin();
@@ -36,35 +30,38 @@ export async function POST(request: NextRequest) {
 
   const { data: rows, error: selectError } = await supabase
     .from("evidence_photos")
-    .select("id")
+    .select("id, photo_url")
     .eq("task_id", taskIdNum)
-    .eq("photo_url", photoUrl)
-    .eq("uploader_address", uploader)
-    .limit(1);
+    .eq("uploader_address", uploader);
 
   if (selectError) {
     return NextResponse.json({ error: selectError.message }, { status: 502 });
   }
 
-  if (!rows?.length) {
+  const row = (rows ?? []).find((r) =>
+    evidenceUrlsMatch(r.photo_url as string, photoUrl)
+  );
+
+  if (!row) {
     return NextResponse.json(
       { error: "Photo not found or you cannot remove it." },
       { status: 404 }
     );
   }
 
+  const storedUrl = row.photo_url as string;
+
   const { error: deleteRowError } = await supabase
     .from("evidence_photos")
     .delete()
-    .eq("task_id", taskIdNum)
-    .eq("photo_url", photoUrl)
-    .eq("uploader_address", uploader);
+    .eq("id", row.id);
 
   if (deleteRowError) {
     return NextResponse.json({ error: deleteRowError.message }, { status: 502 });
   }
 
-  const storagePath = storagePathFromPublicUrl(photoUrl);
+  const storagePath =
+    evidenceStoragePath(storedUrl) ?? evidenceStoragePath(photoUrl);
   if (storagePath) {
     const { error: storageError } = await supabase.storage
       .from("task-evidence")
