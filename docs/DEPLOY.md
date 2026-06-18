@@ -10,9 +10,8 @@ export PATH="$HOME/.foundry/bin:$PATH"
 pnpm deploy:sepolia
 ```
 
-Requires deployer wallet with:
-- CELO for gas (or USDm via fee abstraction from another wallet — deploy uses CELO from Foundry)
-- **150 COPm** minimum for seed tasks (50 + 50 + 50)
+Requires deployer wallet with CELO for gas on Sepolia.
+No seed tasks are created — production starts with an empty task feed.
 
 Copy the logged contract address to `apps/web/.env.local`:
 

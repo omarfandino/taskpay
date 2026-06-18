@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy TaskPay to Celo Sepolia and seed 3 demo tasks.
-# Requires: PRIVATE_KEY with CELO + COPm on Sepolia
+# Deploy TaskPay to Celo Sepolia (contract only, no seed tasks).
+# Requires: PRIVATE_KEY with CELO for gas on Sepolia
 
 export PATH="$HOME/.foundry/bin:$PATH"
 cd "$(dirname "$0")/../apps/contracts"
