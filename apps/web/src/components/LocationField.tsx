@@ -60,7 +60,7 @@ export function LocationField({
       const pos = await getCurrentPosition();
       const coords = `${pos.lat},${pos.lng}`;
       onChange(coords);
-      setHint("Your current location — e.g. portería, home delivery");
+      setHint("Your current location — e.g. building lobby, home delivery");
     } catch {
       alert("Could not get your location. Check permissions.");
     } finally {
