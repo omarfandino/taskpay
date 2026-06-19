@@ -297,7 +297,7 @@ export default function TaskDetailPage() {
         message.includes("User rejected")
           ? "Transaction cancelled."
           : isGasHint
-            ? "Could not complete task. Check you have USDC or another stablecoin for network fees."
+            ? "Could not complete task. Check you have enough balance for network fees."
             : message
       );
     } finally {
@@ -348,7 +348,7 @@ export default function TaskDetailPage() {
         message.includes("User rejected")
           ? "Transaction cancelled."
           : message.includes("insufficient funds") || message.includes("gas")
-            ? "Reject failed. Check you have USDC for network fees."
+            ? "Reject failed. Check you have enough balance for network fees."
             : message
       );
     }

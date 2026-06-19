@@ -124,7 +124,7 @@ export default function CreatePage() {
       alert(
         message.includes("User rejected")
           ? "Transaction cancelled."
-          : "Transaction failed. Check COPm balance and a stablecoin for network fees."
+          : "Transaction failed. Check you have enough COPm for the reward."
       );
     } finally {
       setSubmitting(false);
@@ -160,7 +160,7 @@ export default function CreatePage() {
         <div className="mb-5">
           <ConnectWalletPrompt
             title="Sign in to post tasks"
-            description="Connect MetaMask on Celo Sepolia. You need COPm for rewards and USDC for network fees."
+            description="Connect MetaMask on Celo Sepolia. You need COPm to post task rewards."
           />
         </div>
       )}

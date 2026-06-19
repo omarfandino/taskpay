@@ -26,19 +26,17 @@ export function WelcomeReadyGate({ children }: { children: React.ReactNode }) {
 
   let title = "Setting up your wallet…";
   let description =
-    "We send 1 USDC for network fees. Please wait — do not take tasks yet.";
+    "Getting your wallet ready. Please wait — do not take tasks yet.";
 
   if (status === "claiming") {
-    description = "Sending 1 USDC to your wallet for network fees…";
+    description = "Almost there — finishing wallet setup…";
   } else if (waitingOnChain) {
     title = "Almost ready…";
-    description =
-      "Waiting for USDC to arrive on-chain. This usually takes a few seconds.";
+    description = "This usually takes a few seconds.";
   } else if (isError) {
-    title = "Could not set up network fees";
+    title = "Could not set up your wallet";
     description =
-      message ??
-      "Welcome USDC could not be sent. Try again before taking tasks.";
+      message ?? "Something went wrong. Try again before taking tasks.";
   }
 
   return (

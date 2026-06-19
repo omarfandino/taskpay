@@ -92,7 +92,7 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
 
         if (!response.ok) {
           setStatus("error");
-          setMessage(payload.error || "Could not send welcome USDC.");
+          setMessage(payload.error || "Could not set up your wallet.");
           return;
         }
 
@@ -103,13 +103,11 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
         }
 
         setStatus("sent");
-        setMessage(
-          `You received ${payload.amount ?? "1"} USDC to cover network fees.`
-        );
+        setMessage("Your wallet is ready.");
         await queryClient.invalidateQueries({ queryKey: ["readContract"] });
       } catch {
         setStatus("error");
-        setMessage("Welcome faucet unavailable. Try again later.");
+        setMessage("Wallet setup unavailable. Try again later.");
       }
     },
     [queryClient]

@@ -38,7 +38,7 @@ export function WelcomeUsdcBanner() {
             className="h-8 rounded-lg border-amber-500/40 text-xs"
             onClick={retry}
           >
-            Get test USDC
+            Try again
           </Button>
         )}
       </div>

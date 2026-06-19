@@ -74,8 +74,6 @@ export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
       {lowCopm && (
         <p>
           Posting needs <strong>COPm</strong> for the task reward (min 50 COPm).
-          Your welcome <strong>1 USDC</strong> is only for network fees, not
-          rewards.
           {isMiniPay ? (
             <>
               {" "}
@@ -88,11 +86,11 @@ export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
               in MiniPay, then swap to COPm.
             </>
           ) : (
-            <> Ask the deployer to run `pnpm fund:copm` to your address.</>
+            <> Ask an organizer for test COPm.</>
           )}
         </p>
       )}
-      {lowUsdc && (
+      {!isMiniPay && lowUsdc && (
         <p className={lowCopm ? "mt-2" : undefined}>
           {noUsdc ? (
             <>
