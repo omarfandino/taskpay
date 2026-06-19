@@ -63,14 +63,14 @@ export default function FeedPage() {
       <section className="hero-panel mb-5 overflow-hidden rounded-2xl p-5 shadow-card">
         <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
           <Zap className="h-3.5 w-3.5" aria-hidden />
-          {DEMO_STORAGE_MODE ? "Demo mode" : "Live on Celo"}
+          {DEMO_STORAGE_MODE ? "Demo mode" : "Paid in COPm"}
         </div>
         <h2 className="font-heading text-2xl font-extrabold leading-tight tracking-tight text-foreground">
           Earn COPm for{" "}
           <span className="text-primary">real tasks</span>
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Take micro-jobs near you. Get paid in digital pesos — instantly on MiniPay.
+          Take micro-jobs near you. Get paid in digital pesos.
         </p>
       </section>
 
