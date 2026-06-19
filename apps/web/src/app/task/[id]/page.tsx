@@ -279,7 +279,7 @@ export default function TaskDetailPage() {
       setStatusMsg("Task submitted for review!");
       await refreshViewsAfterTx();
       refetch();
-      router.push("/my-tasks");
+      router.push("/my-tasks?tab=taken");
     } catch (err) {
       console.error(err);
       const message =
@@ -314,6 +314,7 @@ export default function TaskDetailPage() {
       }
       refetch();
       await refreshViewsAfterTx();
+      router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
       alert("Approval failed.");
@@ -334,7 +335,7 @@ export default function TaskDetailPage() {
       }
       refetch();
       await refreshViewsAfterTx();
-      router.push("/my-tasks");
+      router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
       const message =
@@ -363,7 +364,7 @@ export default function TaskDetailPage() {
       }
       refetch();
       await refreshViewsAfterTx();
-      router.push("/my-tasks");
+      router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
       alert("Cancel failed.");
@@ -715,6 +716,7 @@ export default function TaskDetailPage() {
                 try {
                   await rejectTask(taskId, true);
                   refetch();
+                  router.push("/my-tasks?tab=posted");
                 } catch {
                   alert("Reject failed.");
                 }
@@ -749,6 +751,7 @@ export default function TaskDetailPage() {
               try {
                 await approveTask(taskId, true);
                 refetch();
+                router.push("/my-tasks?tab=posted");
               } catch {
                 alert("Approval failed.");
               }

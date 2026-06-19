@@ -28,10 +28,8 @@ export default function MyTasksPage() {
     const requested = params.get("tab");
     if (requested === "taken" || requested === "posted") {
       setTab(requested);
-      if (requested === "taken") {
-        void refreshViews();
-      }
     }
+    void refreshViews();
   }, [refreshViews]);
 
   const { posted, taken, isLoadingPosted, isLoadingTaken } = useMyTasks(address);
