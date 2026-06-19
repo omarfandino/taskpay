@@ -14,6 +14,7 @@ import { getCurrentPosition, sortByDistance, LatLng } from "@/lib/geo";
 import { ConnectWalletPrompt } from "@/components/ConnectWallet";
 import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
 import { useTakeTaskFlow } from "@/hooks/useTakeTaskFlow";
+import { useAppNotice } from "@/components/AppNotice";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 
 type FilterMode = "all" | "nearby";
@@ -24,12 +25,16 @@ export default function FeedPage() {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [locating, setLocating] = useState(false);
-  const [takenTaskIds, setTakenTaskIds] = useState<Set<string>>(() => new Set());
+  const [hiddenTaskIds, setHiddenTaskIds] = useState<Set<string>>(() => new Set());
+  const { showNotice } = useAppNotice();
 
   const { tasks: openTasks, isLoading } = useOpenTasks();
   const { handleTake, isTaking } = useTakeTaskFlow({
     onTaken: (taskId) => {
-      setTakenTaskIds((prev) => new Set(prev).add(taskId.toString()));
+      setHiddenTaskIds((prev) => new Set(prev).add(taskId.toString()));
+    },
+    onTaskUnavailable: (taskId) => {
+      setHiddenTaskIds((prev) => new Set(prev).add(taskId.toString()));
     },
   });
 
@@ -37,13 +42,13 @@ export default function FeedPage() {
 
   const tasks: Task[] = useMemo(() => {
     const visible = openTasks.filter(
-      (task) => !takenTaskIds.has(task.id.toString())
+      (task) => !hiddenTaskIds.has(task.id.toString())
     );
     if (filter === "nearby" && userLocation) {
       return sortByDistance(visible, userLocation);
     }
     return visible;
-  }, [openTasks, filter, userLocation, takenTaskIds]);
+  }, [openTasks, filter, userLocation, hiddenTaskIds]);
 
   async function handleNearby() {
     setLocating(true);
@@ -52,7 +57,7 @@ export default function FeedPage() {
       setUserLocation(pos);
       setFilter("nearby");
     } catch {
-      alert("Could not get your location. Check permissions.");
+      showNotice("Could not get your location. Check permissions.");
     } finally {
       setLocating(false);
     }

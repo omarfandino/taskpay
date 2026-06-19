@@ -35,6 +35,8 @@ import { useRefreshTaskPayViewsAfterTx } from "@/hooks/useInvalidateTaskPayReads
 import { fetchTaskAnswer, saveTaskAnswer } from "@/lib/taskAnswers";
 import { getDemoEvidenceUrls } from "@/lib/demo-store";
 import { useTakeTaskFlow } from "@/hooks/useTakeTaskFlow";
+import { useAppNotice } from "@/components/AppNotice";
+import { getTxErrorMessage } from "@/lib/task-errors";
 import { Button } from "@/components/ui/button";
 import { zeroAddress } from "viem";
 
@@ -45,6 +47,7 @@ export default function TaskDetailPage() {
   const { address, chainId } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
   const refreshViewsAfterTx = useRefreshTaskPayViewsAfterTx();
+  const { showNotice } = useAppNotice();
 
   useTaskPayViewRefreshOnMount(taskPayAvailable);
 
@@ -165,12 +168,12 @@ export default function TaskDetailPage() {
 
   async function handleEvidenceUpload(file: File) {
     if (!taskPayAvailable || !address || !task) {
-      alert("Connect your wallet to upload evidence.");
+      showNotice("Connect your wallet to upload evidence.", "info");
       return;
     }
 
     if (!isTaker || task.status !== TaskStatus.Taken) {
-      alert("You can only add evidence while the task is in progress.");
+      showNotice("You can only add evidence while the task is in progress.", "info");
       return;
     }
 
@@ -191,7 +194,7 @@ export default function TaskDetailPage() {
       const message =
         err instanceof Error ? err.message : "Could not upload evidence.";
       setStatusMsg(message);
-      alert(message);
+      showNotice(message);
     } finally {
       setUploading(false);
     }
@@ -204,7 +207,7 @@ export default function TaskDetailPage() {
       task.evidenceUrl &&
       evidenceUrlsMatch(task.evidenceUrl, photoUrl)
     ) {
-      alert("This photo is already on-chain and cannot be removed.");
+      showNotice("This photo is already on-chain and cannot be removed.", "info");
       return;
     }
 
@@ -226,7 +229,9 @@ export default function TaskDetailPage() {
       setStatusMsg("Photo removed.");
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Could not delete photo.");
+      showNotice(
+        err instanceof Error ? err.message : "Could not delete photo."
+      );
     } finally {
       setDeletingUrl(null);
     }
@@ -276,7 +281,7 @@ export default function TaskDetailPage() {
   async function handleMarkComplete() {
     if (!taskPayAvailable || !address || !task) return;
     if (!canComplete) {
-      alert("Add at least one photo or write an answer before completing.");
+      showNotice("Add at least one photo or write an answer before completing.", "info");
       return;
     }
 
@@ -298,20 +303,8 @@ export default function TaskDetailPage() {
       router.push("/my-tasks?tab=taken");
     } catch (err) {
       console.error(err);
-      const message =
-        err instanceof Error ? err.message : "Could not complete task.";
       setStatusMsg("Complete failed.");
-      const isGasHint =
-        message.includes("User rejected") ||
-        message.includes("insufficient funds") ||
-        message.includes("gas");
-      alert(
-        message.includes("User rejected")
-          ? "Transaction cancelled."
-          : isGasHint
-            ? "Could not complete task. Check you have enough balance for network fees."
-            : message
-      );
+      showNotice(getTxErrorMessage(err, "Could not complete task."));
     } finally {
       setCompleting(false);
     }
@@ -333,7 +326,7 @@ export default function TaskDetailPage() {
       router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
-      alert("Approval failed.");
+      showNotice(getTxErrorMessage(err, "Approval failed."));
     }
   }
 
@@ -354,15 +347,7 @@ export default function TaskDetailPage() {
       router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
-      const message =
-        err instanceof Error ? err.message : "Reject failed.";
-      alert(
-        message.includes("User rejected")
-          ? "Transaction cancelled."
-          : message.includes("insufficient funds") || message.includes("gas")
-            ? "Reject failed. Check you have enough balance for network fees."
-            : message
-      );
+      showNotice(getTxErrorMessage(err, "Reject failed."));
     }
   }
 
@@ -383,7 +368,7 @@ export default function TaskDetailPage() {
       router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
-      alert("Cancel failed.");
+      showNotice(getTxErrorMessage(err, "Cancel failed."));
     }
   }
 
@@ -758,8 +743,8 @@ export default function TaskDetailPage() {
                   await rejectTask(taskId, true);
                   refetch();
                   router.push("/my-tasks?tab=posted");
-                } catch {
-                  alert("Reject failed.");
+                } catch (err) {
+                  showNotice(getTxErrorMessage(err, "Reject failed."));
                 }
               }}
             >
@@ -793,8 +778,8 @@ export default function TaskDetailPage() {
                 await approveTask(taskId, true);
                 refetch();
                 router.push("/my-tasks?tab=posted");
-              } catch {
-                alert("Approval failed.");
+              } catch (err) {
+                showNotice(getTxErrorMessage(err, "Approval failed."));
               }
             }}
           >

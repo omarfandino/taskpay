@@ -25,3 +25,13 @@ export function getTakeTaskErrorMessage(err: unknown): string {
   }
   return "Failed to take task. Check your balance and try again.";
 }
+
+/** User-facing message for failed on-chain actions (approve, reject, complete, etc.). */
+export function getTxErrorMessage(err: unknown, fallback: string): string {
+  const message = err instanceof Error ? err.message : fallback;
+  if (message.includes("User rejected")) return "Transaction cancelled.";
+  if (message.includes("insufficient funds") || message.includes("gas")) {
+    return `${fallback} Check you have enough balance for network fees.`;
+  }
+  return message || fallback;
+}

@@ -11,6 +11,7 @@ import {
   resolveLocationSync,
 } from "@/lib/location";
 import { cn } from "@/lib/utils";
+import { useAppNotice } from "@/components/AppNotice";
 
 type LocationFieldProps = {
   value: string;
@@ -26,6 +27,7 @@ export function LocationField({
   const [hint, setHint] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const { showNotice } = useAppNotice();
 
   const previewValue = value.trim()
     ? resolveLocationSync(value).normalized || value.trim()
@@ -62,7 +64,7 @@ export function LocationField({
       onChange(coords);
       setHint("Your current location — e.g. building lobby, home delivery");
     } catch {
-      alert("Could not get your location. Check permissions.");
+      showNotice("Could not get your location. Check permissions.");
     } finally {
       setLocating(false);
     }

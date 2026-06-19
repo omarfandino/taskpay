@@ -10,6 +10,7 @@ import { MiniPayBanner } from "@/components/MiniPayGuard";
 import { WelcomeUsdcBanner } from "@/components/WelcomeUsdcBanner";
 import { WelcomeUsdcProvider } from "@/components/WelcomeUsdcProvider";
 import { WelcomeReadyGate } from "@/components/WelcomeReadyGate";
+import { AppNoticeProvider } from "@/components/AppNotice";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -37,6 +38,7 @@ export default function RootLayout({
       <body className={`${outfit.variable} ${inter.variable} font-body`}>
         <WalletProvider>
           <WelcomeUsdcProvider>
+            <AppNoticeProvider>
             <div className="relative flex min-h-screen flex-col">
               <MiniPayBanner />
               <WelcomeUsdcBanner />
@@ -47,6 +49,7 @@ export default function RootLayout({
               </WelcomeReadyGate>
               <BottomNav />
             </div>
+            </AppNoticeProvider>
           </WelcomeUsdcProvider>
         </WalletProvider>
       </body>

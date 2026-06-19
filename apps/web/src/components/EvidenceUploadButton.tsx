@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Camera, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAppNotice } from "@/components/AppNotice";
 
 const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/*";
 
@@ -25,13 +26,14 @@ export function EvidenceUploadButton({
 }: EvidenceUploadButtonProps) {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const { showNotice } = useAppNotice();
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     if (file.size === 0) {
-      alert("Photo file is empty. Try Take photo again.");
+      showNotice("Photo file is empty. Try Take photo again.");
       return;
     }
     onFileSelected(file);
