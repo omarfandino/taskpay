@@ -16,6 +16,7 @@ import { LocationField } from "@/components/LocationField";
 import { resolveLocationInput } from "@/lib/location";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { MapPin, Loader2 } from "lucide-react";
 
 const LowBalanceNotice = dynamic(
@@ -32,6 +33,22 @@ const DEADLINE_OPTIONS = [
   { label: "24 hours", hours: 24 },
   { label: "3 days", hours: 72 },
 ];
+
+type FieldErrors = {
+  description?: string;
+  reward?: string;
+  location?: string;
+  form?: string;
+};
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="mt-1.5 text-sm text-red-400" role="alert">
+      {message}
+    </p>
+  );
+}
 
 export default function CreatePage() {
   const router = useRouter();
@@ -55,27 +72,36 @@ export default function CreatePage() {
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [simulated, setSimulated] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const rewardAmount = parseCopm(reward);
   const { needsApproval } = useCopmAllowance(rewardAmount);
   const { postTask, approveCopm, isPending } = useTaskPayActions();
 
+  function validateFields(): FieldErrors {
+    const errors: FieldErrors = {};
+    if (!description.trim() || description.length > 280) {
+      errors.description = "Description must be 1–280 characters.";
+    }
+    if (!reward.trim() || rewardAmount < parseCopm(String(MIN_REWARD_COPM))) {
+      errors.reward = `Minimum reward is ${MIN_REWARD_COPM} COPm.`;
+    }
+    if (!location.trim()) {
+      errors.location = "Please add a location.";
+    }
+    return errors;
+  }
+
   async function handlePublish() {
     if (!taskPayAvailable || !address) return;
-    if (description.length === 0 || description.length > 280) {
-      alert("Description must be 1–280 characters.");
-      return;
-    }
-    if (rewardAmount < parseCopm(String(MIN_REWARD_COPM))) {
-      alert(`Minimum reward is ${MIN_REWARD_COPM} COPm.`);
+
+    const errors = validateFields();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
-    if (!location.trim()) {
-      alert("Please add a location.");
-      return;
-    }
-
+    setFieldErrors({});
     setSubmitting(true);
     setStatus("Checking location…");
 
@@ -83,7 +109,7 @@ export default function CreatePage() {
       const resolved = await resolveLocationInput(location);
       const finalLocation = resolved.normalized.trim();
       if (!finalLocation) {
-        alert("Please add a valid location.");
+        setFieldErrors({ location: "Please add a valid location." });
         return;
       }
 
@@ -121,11 +147,11 @@ export default function CreatePage() {
       setStatus("Failed. Try again.");
       const message =
         err instanceof Error ? err.message : "Transaction failed.";
-      alert(
-        message.includes("User rejected")
+      setFieldErrors({
+        form: message.includes("User rejected")
           ? "Transaction cancelled."
-          : "Transaction failed. Check you have enough COPm for the reward."
-      );
+          : "Transaction failed. Check you have enough COPm for the reward.",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -171,16 +197,24 @@ export default function CreatePage() {
         <div>
           <label className="text-sm font-medium text-foreground">Description</label>
           <textarea
-            className="input-field mt-1.5 min-h-[120px] resize-none py-3"
+            className={cn(
+              "input-field mt-1.5 min-h-[120px] resize-none py-3",
+              fieldErrors.description && "border-red-500/50 ring-1 ring-red-500/30"
+            )}
             disabled={busy}
             placeholder="e.g. Photo of the storefront, or: what's the correct phone number?"
             maxLength={280}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setFieldErrors((prev) => ({ ...prev, description: undefined }));
+            }}
+            aria-invalid={Boolean(fieldErrors.description)}
           />
           <p className="text-xs text-muted-foreground mt-1">
             {description.length}/280
           </p>
+          <FieldError message={fieldErrors.description} />
         </div>
 
         <div>
@@ -189,12 +223,20 @@ export default function CreatePage() {
             type="number"
             min={MIN_REWARD_COPM}
             step="1"
-            className="input-field h-12"
+            className={cn(
+              "input-field h-12",
+              fieldErrors.reward && "border-red-500/50 ring-1 ring-red-500/30"
+            )}
             disabled={busy}
             placeholder={`Min ${MIN_REWARD_COPM} COPm`}
             value={reward}
-            onChange={(e) => setReward(e.target.value)}
+            onChange={(e) => {
+              setReward(e.target.value);
+              setFieldErrors((prev) => ({ ...prev, reward: undefined }));
+            }}
+            aria-invalid={Boolean(fieldErrors.reward)}
           />
+          <FieldError message={fieldErrors.reward} />
         </div>
 
         <div>
@@ -205,10 +247,14 @@ export default function CreatePage() {
           <div className="mt-1.5">
             <LocationField
               value={location}
-              onChange={setLocation}
+              onChange={(value) => {
+                setLocation(value);
+                setFieldErrors((prev) => ({ ...prev, location: undefined }));
+              }}
               disabled={busy}
             />
           </div>
+          <FieldError message={fieldErrors.location} />
         </div>
 
         <div>
@@ -242,7 +288,9 @@ export default function CreatePage() {
           <p className="text-center text-sm text-amber-300">{publishBlockedReason}</p>
         )}
 
-        {status && !busy && (
+        <FieldError message={fieldErrors.form} />
+
+        {status && !busy && !fieldErrors.form && (
           <p className="text-center text-sm text-emerald-400">{status}</p>
         )}
 
