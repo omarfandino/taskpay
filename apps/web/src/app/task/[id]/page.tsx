@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, Zap } from "lucide-react";
 import {
   TaskStatus,
   formatCopm,
@@ -18,6 +18,8 @@ import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskById, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
 import { useTaskPayActions } from "@/hooks/useTaskPayActions";
 import { ContractNotDeployed } from "@/components/ContractNotDeployed";
+import { LowBalanceNotice } from "@/components/MiniPayGuard";
+import { ConnectWalletPrompt } from "@/components/ConnectWallet";
 import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
 import { Countdown, StatusBadge, TaskStatusPanel } from "@/components/task-utils";
 import { uploadEvidencePhoto } from "@/lib/uploadEvidence";
@@ -32,6 +34,7 @@ import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMou
 import { useRefreshTaskPayViewsAfterTx } from "@/hooks/useInvalidateTaskPayReads";
 import { fetchTaskAnswer, saveTaskAnswer } from "@/lib/taskAnswers";
 import { getDemoEvidenceUrls } from "@/lib/demo-store";
+import { useTakeTaskFlow } from "@/hooks/useTakeTaskFlow";
 import { Button } from "@/components/ui/button";
 import { zeroAddress } from "viem";
 
@@ -71,6 +74,7 @@ export default function TaskDetailPage() {
     cancelTask,
     isPending,
   } = useTaskPayActions();
+  const { handleTake, isTaking } = useTakeTaskFlow();
 
   const isPoster =
     task && address && task.poster.toLowerCase() === address.toLowerCase();
@@ -400,6 +404,10 @@ export default function TaskDetailPage() {
     DEMO_STORAGE_MODE &&
     isDemoSeedTask(task.poster) &&
     task.status === TaskStatus.PendingReview;
+  const canTake =
+    task.status === TaskStatus.Open &&
+    task.taker === zeroAddress &&
+    !(address && task.poster.toLowerCase() === address.toLowerCase());
 
   return (
     <div className="page-shell mx-auto max-w-lg px-4 pb-28 pt-4 space-y-5">
@@ -464,6 +472,27 @@ export default function TaskDetailPage() {
           referrerPolicy="no-referrer-when-downgrade"
         />
       </div>
+
+      {canTake && address && <LowBalanceNotice mode="browse" />}
+
+      {canTake && !address && (
+        <ConnectWalletPrompt
+          title="Sign in to take this task"
+          description="Connect your wallet to accept this job and earn COPm."
+        />
+      )}
+
+      {canTake && (
+        <Button
+          type="button"
+          className="h-14 w-full gap-2 rounded-2xl text-base font-bold shadow-glow"
+          disabled={!address || isTaking(taskId)}
+          onClick={() => void handleTake(taskId)}
+        >
+          <Zap className="h-5 w-5" aria-hidden />
+          {isTaking(taskId) ? "Taking…" : "Take task"}
+        </Button>
+      )}
 
       {hasEvidence && (
         <div className="block-card p-4">

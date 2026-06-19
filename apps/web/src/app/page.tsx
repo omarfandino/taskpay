@@ -1,12 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { MapPin, Zap } from "lucide-react";
 import { Task } from "@/lib/constants";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useOpenTasks, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
-import { useTaskPayActions } from "@/hooks/useTaskPayActions";
 import { ContractNotDeployed } from "@/components/ContractNotDeployed";
 import { TaskCard } from "@/components/TaskCard";
 import { LowBalanceNotice } from "@/components/MiniPayGuard";
@@ -14,28 +12,26 @@ import { SegmentTabs } from "@/components/SegmentTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { getCurrentPosition, sortByDistance, LatLng } from "@/lib/geo";
 import { ConnectWalletPrompt } from "@/components/ConnectWallet";
-import { useRefreshTaskPayViewsAfterTx } from "@/hooks/useInvalidateTaskPayReads";
 import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
-import { getExplorerUrl } from "@/lib/constants";
+import { useTakeTaskFlow } from "@/hooks/useTakeTaskFlow";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 
 type FilterMode = "all" | "nearby";
 
 export default function FeedPage() {
-  const router = useRouter();
-  const { address, chainId, needsConnect, isMiniPay, mounted } = useMiniPay();
+  const { address, needsConnect, isMiniPay, mounted } = useMiniPay();
   const taskPayAvailable = useTaskPayAvailable();
   const [filter, setFilter] = useState<FilterMode>("all");
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [locating, setLocating] = useState(false);
-  const [takingId, setTakingId] = useState<bigint | null>(null);
   const [takenTaskIds, setTakenTaskIds] = useState<Set<string>>(() => new Set());
-  const [lastTx, setLastTx] = useState<string | null>(null);
-  const [simulated, setSimulated] = useState(false);
 
-  const refreshViewsAfterTx = useRefreshTaskPayViewsAfterTx();
-  const { tasks: openTasks, isLoading, refetch } = useOpenTasks();
-  const { takeTask, isPending } = useTaskPayActions();
+  const { tasks: openTasks, isLoading } = useOpenTasks();
+  const { handleTake, isTaking } = useTakeTaskFlow({
+    onTaken: (taskId) => {
+      setTakenTaskIds((prev) => new Set(prev).add(taskId.toString()));
+    },
+  });
 
   useTaskPayViewRefreshOnMount(taskPayAvailable);
 
@@ -59,41 +55,6 @@ export default function FeedPage() {
       alert("Could not get your location. Check permissions.");
     } finally {
       setLocating(false);
-    }
-  }
-
-  async function handleTake(taskId: bigint) {
-    if (!address) {
-      alert("Connect your wallet first using the Connect button above.");
-      return;
-    }
-    const taskKey = taskId.toString();
-    setTakingId(taskId);
-    try {
-      const hash = await takeTask(taskId);
-      if (hash == null) {
-        throw new Error("Could not take task.");
-      }
-      setTakenTaskIds((prev) => new Set(prev).add(taskKey));
-      await refreshViewsAfterTx();
-      if (hash === "demo-simulated") {
-        setSimulated(true);
-        setLastTx(null);
-      } else if (hash) {
-        setSimulated(false);
-        setLastTx(hash);
-      }
-      router.push("/my-tasks?tab=taken");
-    } catch (err) {
-      setTakenTaskIds((prev) => {
-        const next = new Set(prev);
-        next.delete(taskKey);
-        return next;
-      });
-      console.error(err);
-      alert("Failed to take task. Check your balance and try again.");
-    } finally {
-      setTakingId(null);
     }
   }
 
@@ -166,30 +127,11 @@ export default function FeedPage() {
             key={task.id.toString()}
             task={task}
             showTake
-            taking={takingId === task.id && isPending}
+            taking={isTaking(task.id)}
             onTake={handleTake}
           />
         ))}
       </div>
-
-      {simulated && (
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Simulated — no on-chain transaction
-        </p>
-      )}
-
-      {lastTx && chainId && !simulated && (
-        <p className="mt-4 text-center text-sm">
-          <a
-            href={getExplorerUrl(chainId, lastTx)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-bold text-primary underline"
-          >
-            View transaction on Celoscan
-          </a>
-        </p>
-      )}
     </div>
   );
 }

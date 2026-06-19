@@ -77,18 +77,27 @@ export function TaskCard({
           View on map
         </a>
         {showTake && task.status === TaskStatus.Open && onTake && (
-          <Button
-            className="min-h-[48px] w-full gap-2 rounded-xl text-base font-bold transition-colors duration-200 shadow-glow"
-            disabled={taking}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onTake(task.id);
-            }}
-          >
-            <Zap className="h-4 w-4" aria-hidden />
-            {taking ? "Taking task…" : "Take task"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="min-h-[48px] min-w-0 flex-1 rounded-xl text-sm font-bold"
+              asChild
+            >
+              <Link href={`/task/${task.id.toString()}`}>View details</Link>
+            </Button>
+            <Button
+              className="min-h-[48px] min-w-0 flex-[1.35] gap-1.5 rounded-xl text-sm font-bold shadow-glow"
+              disabled={taking}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onTake(task.id);
+              }}
+            >
+              <Zap className="h-4 w-4 shrink-0" aria-hidden />
+              {taking ? "Taking…" : "Take task"}
+            </Button>
+          </div>
         )}
         {linkToDetail && !showTake && (
           <span className="flex items-center justify-center gap-1 text-xs font-semibold text-primary">
