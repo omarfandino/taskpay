@@ -1,104 +1,24 @@
-"use client";
+import { Suspense } from "react";
+import { MyTasksView } from "./MyTasksView";
 
-import { useEffect, useState } from "react";
-import { useMiniPay } from "@/hooks/useMiniPay";
-import { useMyTasks, useTaskPayAvailable } from "@/hooks/useTaskPayReads";
-import { ContractNotDeployed } from "@/components/ContractNotDeployed";
-import { TaskCard } from "@/components/TaskCard";
-import { PageHeader } from "@/components/PageHeader";
-import { SegmentTabs } from "@/components/SegmentTabs";
-import { EmptyState } from "@/components/EmptyState";
-
-import { ConnectWalletPrompt } from "@/components/ConnectWallet";
-import { useRefreshTaskPayViews } from "@/hooks/useInvalidateTaskPayReads";
-import { useTaskPayViewRefreshOnMount } from "@/hooks/useTaskPayViewRefreshOnMount";
-
-type Tab = "posted" | "taken";
-
-export default function MyTasksPage() {
-  const { address, isMiniPay, mounted, needsConnect } = useMiniPay();
-  const taskPayAvailable = useTaskPayAvailable();
-  const [tab, setTab] = useState<Tab>("posted");
-  const refreshViews = useRefreshTaskPayViews();
-
-  useTaskPayViewRefreshOnMount(Boolean(address && taskPayAvailable));
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requested = params.get("tab");
-    if (requested === "taken" || requested === "posted") {
-      setTab(requested);
-    }
-    void refreshViews();
-  }, [refreshViews]);
-
-  const { posted, taken, isLoadingPosted, isLoadingTaken } = useMyTasks(address);
-
-  const tasks = tab === "posted" ? posted : taken;
-  const loading = tab === "posted" ? isLoadingPosted : isLoadingTaken;
-
+function MyTasksFallback() {
   return (
     <div className="page-shell mx-auto max-w-lg px-4 pb-28 pt-5">
-      <PageHeader
-        title="My tasks"
-        subtitle="Track tasks you posted or accepted."
-      />
-
-      <SegmentTabs
-        tabs={[
-          { id: "posted", label: "Posted" },
-          { id: "taken", label: "Taken" },
-        ]}
-        active={tab}
-        onChange={(id) => {
-          setTab(id as Tab);
-          if (id === "taken") {
-            void refreshViews();
-          }
-        }}
-      />
-
-      {mounted && needsConnect && (
-        <div className="py-4">
-          {isMiniPay ? (
-            <p className="text-center text-sm text-muted-foreground">
-              Connecting your MiniPay wallet…
-            </p>
-          ) : (
-            <ConnectWalletPrompt
-              title="Sign in to see your tasks"
-              description="Connect the wallet you used to post or take tasks."
-            />
-          )}
-        </div>
-      )}
-
-      {!taskPayAvailable && <ContractNotDeployed />}
-
-      {address && taskPayAvailable && loading && (
-        <div className="space-y-4 py-2">
-          {[1, 2].map((i) => (
-            <div key={i} className="skeleton h-40 rounded-2xl" />
-          ))}
-        </div>
-      )}
-
-      {address && taskPayAvailable && !loading && tasks.length === 0 && (
-        <EmptyState
-          title={`No ${tab} tasks yet`}
-          description={
-            tab === "posted"
-              ? "Post a task from the Create tab."
-              : "Take a task from the Feed."
-          }
-        />
-      )}
-
-      <div className="space-y-4">
-        {tasks.map((task) => (
-          <TaskCard key={task.id.toString()} task={task} linkToDetail />
-        ))}
+      <div className="skeleton mb-2 h-8 w-40 rounded-lg" />
+      <div className="skeleton mb-5 h-4 w-64 rounded-md" />
+      <div className="skeleton mb-4 h-11 w-full rounded-full" />
+      <div className="space-y-4 py-2">
+        <div className="skeleton h-40 rounded-2xl" />
+        <div className="skeleton h-40 rounded-2xl" />
       </div>
     </div>
+  );
+}
+
+export default function MyTasksPage() {
+  return (
+    <Suspense fallback={<MyTasksFallback />}>
+      <MyTasksView />
+    </Suspense>
   );
 }
