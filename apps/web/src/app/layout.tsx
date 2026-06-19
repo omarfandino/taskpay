@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   title: "TaskPay — Earn digital pesos for real tasks",
   description:
     "Post and complete micro-tasks with COPm rewards. Built for MiniPay on Celo.",
+  other: {
+    "talentapp:project_verification":
+      "491093f449caea2719774eecb336a3b3fd4dccbbed404cfd9ab547be2a415ca558d893024a138a82cbfd7d2bd8c0f4f25074812b9499f789344f78d514b981b8",
+  },
 };
 
 export default function RootLayout({
