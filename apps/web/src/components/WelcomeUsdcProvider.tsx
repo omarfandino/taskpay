@@ -36,6 +36,8 @@ type WelcomeUsdcContextValue = {
   retry: (() => void) | undefined;
   /** Block feed/actions until welcome grant is confirmed on-chain. */
   isWalletSetupBlocking: boolean;
+  /** True once a new welcome grant is confirmed on-chain this session. */
+  showSuccessBanner: boolean;
 };
 
 const WelcomeUsdcContext = createContext<WelcomeUsdcContextValue | null>(null);
@@ -87,6 +89,10 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
       (usdcBalance as bigint) >= WELCOME_USDC_AMOUNT
     : nativeBalance !== undefined &&
       nativeBalance.value >= WELCOME_CELO_AMOUNT;
+
+  const balancesLoaded = isMiniPay
+    ? usdcBalance !== undefined
+    : nativeBalance !== undefined;
 
   const claimWelcome = useCallback(
     async (wallet: string) => {
@@ -148,10 +154,18 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
 
     const key = address.toLowerCase();
     if (claimedFor.current === key) return;
+
+    if (!balancesLoaded) return;
+
     claimedFor.current = key;
 
+    if (hasFeeCoverage) {
+      setStatus("already_claimed");
+      return;
+    }
+
     void claimWelcome(address);
-  }, [address, claimWelcome, mounted]);
+  }, [address, balancesLoaded, claimWelcome, hasFeeCoverage, mounted]);
 
   useEffect(() => {
     if (status !== "sent" || hasFeeCoverage) {
@@ -170,9 +184,15 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
     if (!mounted || DEMO_STORAGE_MODE || !isConnected || !address) {
       return false;
     }
-    if (status === "already_claimed" || status === "skipped") return false;
+    if (
+      status === "already_claimed" ||
+      status === "skipped" ||
+      status === "idle" ||
+      status === "claiming"
+    ) {
+      return false;
+    }
     if (status === "error") return true;
-    if (status === "idle" || status === "claiming") return true;
     if (status === "sent") {
       if (hasFeeCoverage) return false;
       if (setupTimedOut) return false;
@@ -194,8 +214,17 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
       message,
       retry: address ? () => claimWelcome(address) : undefined,
       isWalletSetupBlocking,
+      showSuccessBanner:
+        status === "sent" && hasFeeCoverage && Boolean(message),
     }),
-    [address, claimWelcome, isWalletSetupBlocking, message, status]
+    [
+      address,
+      claimWelcome,
+      hasFeeCoverage,
+      isWalletSetupBlocking,
+      message,
+      status,
+    ]
   );
 
   return (

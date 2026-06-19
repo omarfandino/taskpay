@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 
 /** Brief status after setup gate — success toast or error when gate timed out. */
 export function WelcomeUsdcBanner() {
-  const { status, message, retry, isWalletSetupBlocking } = useWelcomeUsdc();
+  const { status, message, retry, isWalletSetupBlocking, showSuccessBanner } =
+    useWelcomeUsdc();
 
   if (isWalletSetupBlocking) return null;
 
@@ -18,7 +19,7 @@ export function WelcomeUsdcBanner() {
     return null;
   }
 
-  if (status === "sent" && message) {
+  if (showSuccessBanner && message) {
     return (
       <div className="border-b border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-center text-sm text-emerald-300">
         {message}
