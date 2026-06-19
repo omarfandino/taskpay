@@ -11,12 +11,16 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useReadContract } from "wagmi";
+import { useBalance, useReadContract } from "wagmi";
 import { erc20Abi } from "@/lib/taskpay-abi";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { getUsdcAddress } from "@/lib/tx";
-import { WELCOME_USDC_AMOUNT } from "@/lib/welcome-faucet";
+import {
+  WELCOME_CELO_AMOUNT,
+  WELCOME_USDC_AMOUNT,
+  type WelcomeClient,
+} from "@/lib/welcome-faucet";
 
 export type WelcomeStatus =
   | "idle"
@@ -30,7 +34,7 @@ type WelcomeUsdcContextValue = {
   status: WelcomeStatus;
   message: string | null;
   retry: (() => void) | undefined;
-  /** Block feed/actions until welcome USDC is confirmed on-chain (MiniPay new wallets). */
+  /** Block feed/actions until welcome grant is confirmed on-chain. */
   isWalletSetupBlocking: boolean;
 };
 
@@ -45,12 +49,13 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
   const [setupTimedOut, setSetupTimedOut] = useState(false);
   const claimedFor = useRef<string | null>(null);
+  const isMiniPayRef = useRef(isMiniPay);
+  isMiniPayRef.current = isMiniPay;
 
   const usdc = getUsdcAddress(chainId);
 
-  const waitingForUsdcOnChain =
+  const waitingForGrantOnChain =
     mounted &&
-    isMiniPay &&
     isConnected &&
     Boolean(address) &&
     !DEMO_STORAGE_MODE &&
@@ -62,17 +67,33 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: {
-      enabled: Boolean(address && !DEMO_STORAGE_MODE),
-      refetchInterval: waitingForUsdcOnChain ? 2000 : false,
+      enabled: Boolean(address && !DEMO_STORAGE_MODE && isMiniPay),
+      refetchInterval:
+        waitingForGrantOnChain && isMiniPay ? 2000 : false,
     },
   });
 
-  const hasUsdcForFees =
-    usdcBalance !== undefined &&
-    (usdcBalance as bigint) >= WELCOME_USDC_AMOUNT;
+  const { data: nativeBalance } = useBalance({
+    address,
+    query: {
+      enabled: Boolean(address && !DEMO_STORAGE_MODE && !isMiniPay),
+      refetchInterval:
+        waitingForGrantOnChain && !isMiniPay ? 2000 : false,
+    },
+  });
+
+  const hasFeeCoverage = isMiniPay
+    ? usdcBalance !== undefined &&
+      (usdcBalance as bigint) >= WELCOME_USDC_AMOUNT
+    : nativeBalance !== undefined &&
+      nativeBalance.value >= WELCOME_CELO_AMOUNT;
 
   const claimWelcome = useCallback(
     async (wallet: string) => {
+      const client: WelcomeClient = isMiniPayRef.current
+        ? "minipay"
+        : "browser";
+
       setStatus("claiming");
       setMessage(null);
       setSetupTimedOut(false);
@@ -81,7 +102,7 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
         const response = await fetch("/api/welcome-usdc", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: wallet }),
+          body: JSON.stringify({ address: wallet, client }),
         });
 
         const payload = (await response.json()) as {
@@ -92,22 +113,28 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
 
         if (!response.ok) {
           setStatus("error");
-          setMessage(payload.error || "Could not set up your wallet.");
+          setMessage(
+            payload.error || "Could not add network fee coverage."
+          );
           return;
         }
 
         if (payload.status === "already_claimed") {
           setStatus("already_claimed");
           await queryClient.invalidateQueries({ queryKey: ["readContract"] });
+          await queryClient.invalidateQueries({ queryKey: ["balance"] });
           return;
         }
 
         setStatus("sent");
-        setMessage("Your wallet is ready.");
+        setMessage(
+          "Welcome reward added — network fees covered for your first tasks."
+        );
         await queryClient.invalidateQueries({ queryKey: ["readContract"] });
+        await queryClient.invalidateQueries({ queryKey: ["balance"] });
       } catch {
         setStatus("error");
-        setMessage("Wallet setup unavailable. Try again later.");
+        setMessage("Network fee setup unavailable. Try again later.");
       }
     },
     [queryClient]
@@ -119,20 +146,15 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (!isMiniPay) {
-      setStatus("skipped");
-      return;
-    }
-
     const key = address.toLowerCase();
     if (claimedFor.current === key) return;
     claimedFor.current = key;
 
     void claimWelcome(address);
-  }, [address, claimWelcome, isMiniPay, mounted]);
+  }, [address, claimWelcome, mounted]);
 
   useEffect(() => {
-    if (status !== "sent" || hasUsdcForFees) {
+    if (status !== "sent" || hasFeeCoverage) {
       setSetupTimedOut(false);
       return;
     }
@@ -142,26 +164,25 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
       SETUP_TIMEOUT_MS
     );
     return () => window.clearTimeout(timer);
-  }, [status, hasUsdcForFees, address]);
+  }, [status, hasFeeCoverage, address]);
 
   const isWalletSetupBlocking = useMemo(() => {
-    if (!mounted || DEMO_STORAGE_MODE || !isMiniPay || !isConnected || !address) {
+    if (!mounted || DEMO_STORAGE_MODE || !isConnected || !address) {
       return false;
     }
     if (status === "already_claimed" || status === "skipped") return false;
     if (status === "error") return true;
     if (status === "idle" || status === "claiming") return true;
     if (status === "sent") {
-      if (hasUsdcForFees) return false;
+      if (hasFeeCoverage) return false;
       if (setupTimedOut) return false;
       return true;
     }
     return false;
   }, [
     address,
-    hasUsdcForFees,
+    hasFeeCoverage,
     isConnected,
-    isMiniPay,
     mounted,
     setupTimedOut,
     status,

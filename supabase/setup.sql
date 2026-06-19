@@ -88,7 +88,7 @@ create policy "Allow anon delete task-evidence"
   on storage.objects for delete
   using (bucket_id = 'task-evidence');
 
--- Welcome USDC faucet (one claim per wallet)
+-- Welcome network-fee grants (one claim per wallet — USDC for MiniPay, CELO for browser)
 create table if not exists welcome_claims (
   address text primary key,
   tx_hash text not null,

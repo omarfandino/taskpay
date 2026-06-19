@@ -202,6 +202,19 @@ export function TaskStatusPanel({
     );
   }
 
+  if (task.status === TaskStatus.Taken && !isTaker && !isPoster) {
+    return (
+      <div className="rounded-2xl border border-border bg-muted/50 p-4 text-center">
+        <p className="font-bold text-foreground">
+          This task is no longer available
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Someone else is working on it. Check the feed for other open jobs.
+        </p>
+      </div>
+    );
+  }
+
   return null;
 }
 

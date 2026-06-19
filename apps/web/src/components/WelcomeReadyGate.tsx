@@ -24,17 +24,21 @@ export function WelcomeReadyGate({ children }: { children: React.ReactNode }) {
   const isError = status === "error";
   const waitingOnChain = status === "sent";
 
-  let title = "Setting up your wallet…";
+  let eyebrow = "New user";
+  let title = "Welcome reward";
   let description =
-    "Getting your wallet ready. Please wait — do not take tasks yet.";
+    "We're adding coverage for your network fees. Please wait before taking tasks.";
 
   if (status === "claiming") {
-    description = "Almost there — finishing wallet setup…";
+    description = "Sending your welcome reward for network fee coverage…";
   } else if (waitingOnChain) {
-    title = "Almost ready…";
-    description = "This usually takes a few seconds.";
+    eyebrow = "Almost there";
+    title = "Confirming your reward";
+    description =
+      "Your network fee coverage is on the way. This usually takes a few seconds.";
   } else if (isError) {
-    title = "Could not set up your wallet";
+    eyebrow = "Setup";
+    title = "Could not add network fee coverage";
     description =
       message ?? "Something went wrong. Try again before taking tasks.";
   }
@@ -49,7 +53,10 @@ export function WelcomeReadyGate({ children }: { children: React.ReactNode }) {
               aria-hidden
             />
           </div>
-          <h2 className="font-heading text-lg font-extrabold text-foreground">
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">
+            {eyebrow}
+          </p>
+          <h2 className="mt-1 font-heading text-lg font-extrabold text-foreground">
             {title}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">

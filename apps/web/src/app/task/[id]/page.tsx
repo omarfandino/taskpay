@@ -74,7 +74,19 @@ export default function TaskDetailPage() {
     cancelTask,
     isPending,
   } = useTaskPayActions();
-  const { handleTake, isTaking } = useTakeTaskFlow();
+  const { handleTake, isTaking } = useTakeTaskFlow({
+    onTakeFailed: refetch,
+  });
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        refetch();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refetch]);
 
   const isPoster =
     task && address && task.poster.toLowerCase() === address.toLowerCase();

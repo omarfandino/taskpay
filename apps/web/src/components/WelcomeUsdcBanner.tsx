@@ -21,7 +21,7 @@ export function WelcomeUsdcBanner() {
   if (status === "sent" && message) {
     return (
       <div className="border-b border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-center text-sm text-emerald-300">
-        {message} You can take tasks now.
+        {message}
       </div>
     );
   }

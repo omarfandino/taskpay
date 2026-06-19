@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskPayActions } from "@/hooks/useTaskPayActions";
 import { useRefreshTaskPayViewsAfterTx } from "@/hooks/useInvalidateTaskPayReads";
+import { getTakeTaskErrorMessage, isTaskNotOpenError } from "@/lib/task-errors";
 
 export function useTakeTaskFlow(options?: {
   onTaken?: (taskId: bigint) => void;
+  /** e.g. refetch task detail after a failed take */
+  onTakeFailed?: () => void | Promise<void>;
 }) {
   const router = useRouter();
   const { address } = useMiniPay();
@@ -16,6 +19,8 @@ export function useTakeTaskFlow(options?: {
   const [takingId, setTakingId] = useState<bigint | null>(null);
   const onTakenRef = useRef(options?.onTaken);
   onTakenRef.current = options?.onTaken;
+  const onTakeFailedRef = useRef(options?.onTakeFailed);
+  onTakeFailedRef.current = options?.onTakeFailed;
 
   const handleTake = useCallback(
     async (taskId: bigint) => {
@@ -35,7 +40,11 @@ export function useTakeTaskFlow(options?: {
         router.push("/my-tasks?tab=taken");
       } catch (err) {
         console.error(err);
-        alert("Failed to take task. Check your balance and try again.");
+        if (isTaskNotOpenError(err)) {
+          await refreshViewsAfterTx();
+        }
+        await onTakeFailedRef.current?.();
+        alert(getTakeTaskErrorMessage(err));
       } finally {
         setTakingId(null);
       }
