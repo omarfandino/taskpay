@@ -17,8 +17,8 @@ import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { getUsdcAddress } from "@/lib/tx";
 import {
-  WELCOME_CELO_AMOUNT,
-  WELCOME_USDC_AMOUNT,
+  hasBrowserNetworkFeeCoverage,
+  hasMiniPayNetworkFeeCoverage,
   type WelcomeClient,
 } from "@/lib/welcome-faucet";
 
@@ -38,6 +38,8 @@ type WelcomeUsdcContextValue = {
   isWalletSetupBlocking: boolean;
   /** True once a new welcome grant is confirmed on-chain this session. */
   showSuccessBanner: boolean;
+  /** Welcome grant still resolving — hide premature low-balance warnings. */
+  isWelcomeInProgress: boolean;
 };
 
 const WelcomeUsdcContext = createContext<WelcomeUsdcContextValue | null>(null);
@@ -69,9 +71,8 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: {
-      enabled: Boolean(address && !DEMO_STORAGE_MODE && isMiniPay),
-      refetchInterval:
-        waitingForGrantOnChain && isMiniPay ? 2000 : false,
+      enabled: Boolean(address && !DEMO_STORAGE_MODE),
+      refetchInterval: waitingForGrantOnChain ? 2000 : false,
     },
   });
 
@@ -84,15 +85,16 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const usdcWei = usdcBalance as bigint | undefined;
+  const nativeWei = nativeBalance?.value;
+
   const hasFeeCoverage = isMiniPay
-    ? usdcBalance !== undefined &&
-      (usdcBalance as bigint) >= WELCOME_USDC_AMOUNT
-    : nativeBalance !== undefined &&
-      nativeBalance.value >= WELCOME_CELO_AMOUNT;
+    ? hasMiniPayNetworkFeeCoverage(usdcWei)
+    : hasBrowserNetworkFeeCoverage(nativeWei, usdcWei);
 
   const balancesLoaded = isMiniPay
-    ? usdcBalance !== undefined
-    : nativeBalance !== undefined;
+    ? usdcWei !== undefined
+    : nativeWei !== undefined && usdcWei !== undefined;
 
   const claimWelcome = useCallback(
     async (wallet: string) => {
@@ -208,6 +210,14 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
     status,
   ]);
 
+  const isWelcomeInProgress = useMemo(() => {
+    if (DEMO_STORAGE_MODE || !mounted || !address) return false;
+    if (status === "claiming") return true;
+    if (status === "sent" && !hasFeeCoverage) return true;
+    if (status === "idle" && !balancesLoaded) return true;
+    return false;
+  }, [address, balancesLoaded, hasFeeCoverage, mounted, status]);
+
   const value = useMemo(
     () => ({
       status,
@@ -216,12 +226,14 @@ export function WelcomeUsdcProvider({ children }: { children: ReactNode }) {
       isWalletSetupBlocking,
       showSuccessBanner:
         status === "sent" && hasFeeCoverage && Boolean(message),
+      isWelcomeInProgress,
     }),
     [
       address,
       claimWelcome,
       hasFeeCoverage,
       isWalletSetupBlocking,
+      isWelcomeInProgress,
       message,
       status,
     ]

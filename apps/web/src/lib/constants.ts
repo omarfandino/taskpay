@@ -9,10 +9,12 @@ export const TOKEN_ADDRESSES = {
   [CHAIN_IDS.celo]: {
     copm: "0x8a567e2ae79ca692bd748ab832081c45de4041ea" as const,
     usdc: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C" as const,
+    usdcAdapter: "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B" as const,
   },
   [CHAIN_IDS.celoSepolia]: {
     copm: "0x5F8d55c3627d2dc0a2B4afa798f877242F382F67" as const,
     usdc: "0x01C5C0122039549AD1493B8220cABEdD739BC44E" as const,
+    usdcAdapter: "0x4822e58de6f5e485eF90df51C41CE01721331dC0" as const,
   },
 } as const;
 

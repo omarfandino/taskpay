@@ -2,11 +2,12 @@
 
 import { useBalance, useReadContract } from "wagmi";
 import { erc20Abi } from "@/lib/taskpay-abi";
-import { getCopmAddress } from "@/lib/tx";
+import { getCopmAddress, getUsdcAddress } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { MINIPAY_DEPOSIT_URL } from "@/lib/constants";
-import { MIN_CELO_FOR_FEES } from "@/lib/welcome-faucet";
+import { hasBrowserNetworkFeeCoverage } from "@/lib/welcome-faucet";
+import { useWelcomeUsdc } from "@/components/WelcomeUsdcProvider";
 
 export function MiniPayBanner() {
   const { mounted, isMiniPay } = useMiniPay();
@@ -30,16 +31,18 @@ export function MiniPayBanner() {
 }
 
 type LowBalanceNoticeProps = {
-  /** `browse` = Feed / take tasks (USDC fees only). `post` = Create (COPm reward + USDC fees). */
+  /** `browse` = Feed / take tasks. `post` = Create (COPm reward + network fees). */
   mode?: "browse" | "post";
 };
 
 export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
   const { address, chainId, isMiniPay } = useMiniPay();
+  const { isWelcomeInProgress } = useWelcomeUsdc();
 
-  if (DEMO_STORAGE_MODE) return null;
+  if (DEMO_STORAGE_MODE || isWelcomeInProgress) return null;
 
   const copm = getCopmAddress(chainId);
+  const usdc = getUsdcAddress(chainId);
 
   const { data: copmBal } = useReadContract({
     address: copm,
@@ -47,6 +50,14 @@ export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address) },
+  });
+
+  const { data: usdcBal } = useReadContract({
+    address: usdc,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address && !isMiniPay) },
   });
 
   const { data: nativeBal } = useBalance({
@@ -58,14 +69,19 @@ export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
     mode === "post" &&
     copmBal !== undefined &&
     (copmBal as bigint) === 0n;
-  const lowNative =
-    !isMiniPay &&
-    nativeBal !== undefined &&
-    nativeBal.value < MIN_CELO_FOR_FEES;
-  const noNative =
-    nativeBal !== undefined && nativeBal.value === 0n;
 
-  if (!lowCopm && !lowNative) return null;
+  const browserFeesLoaded =
+    isMiniPay ||
+    (nativeBal !== undefined && usdcBal !== undefined);
+  const lowBrowserFees =
+    !isMiniPay &&
+    browserFeesLoaded &&
+    !hasBrowserNetworkFeeCoverage(
+      nativeBal?.value,
+      usdcBal as bigint | undefined
+    );
+
+  if (!lowCopm && !lowBrowserFees) return null;
 
   return (
     <div className="reward-chip mb-4 w-full flex-col items-start gap-1 p-4 text-sm text-foreground">
@@ -88,22 +104,9 @@ export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
           )}
         </p>
       )}
-      {!isMiniPay && lowNative && (
+      {lowBrowserFees && (
         <p className={lowCopm ? "mt-2" : undefined}>
-          {noNative ? (
-            <>
-              Keep funds available for network fees.
-              {mode === "browse" && !lowCopm && (
-                <>
-                  {" "}
-                  New accounts get a welcome reward automatically — wait a few
-                  seconds after connecting.
-                </>
-              )}
-            </>
-          ) : (
-            <>Running low on funds for network fees. Top up soon.</>
-          )}{" "}
+          Keep funds available for network fees.{" "}
           <a
             href="https://faucet.celo.org/celo-sepolia"
             className="font-bold text-primary underline transition-colors duration-200 hover:text-primary/80"

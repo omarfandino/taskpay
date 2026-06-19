@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { decodeEventLog } from "viem";
 import {
   usePublicClient,
@@ -10,7 +10,7 @@ import {
 } from "wagmi";
 import { taskPayAbi, erc20Abi } from "@/lib/taskpay-abi";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
-import { feeCurrencyFor, getCopmAddress } from "@/lib/tx";
+import { feeCurrencyFor, getCopmAddress, getUsdcAddress, shouldPayBrowserFeesWithUsdc } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { useTaskPayAddress } from "@/hooks/useTaskPayAddress";
 import { useInvalidateTaskPayReads } from "@/hooks/useInvalidateTaskPayReads";
@@ -72,11 +72,32 @@ export function useCopmAllowance(rewardAmount: bigint): {
 }
 
 export function useTaskPayActions() {
-  const { address, chainId } = useMiniPay();
+  const { address, chainId, isMiniPay } = useMiniPay();
   const taskPayAddress = useTaskPayAddress();
   const copmAddress = getCopmAddress(chainId);
+  const usdcAddress = getUsdcAddress(chainId);
   const publicClient = usePublicClient({ chainId });
   const invalidateTaskReads = useInvalidateTaskPayReads();
+
+  const { data: usdcBalance } = useReadContract({
+    address: usdcAddress,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(!DEMO_STORAGE_MODE && address && !isMiniPay),
+    },
+  });
+
+  const txFeeCurrency = useMemo(
+    () =>
+      feeCurrencyFor(chainId, {
+        payFeesWithUsdc:
+          !isMiniPay &&
+          shouldPayBrowserFeesWithUsdc(usdcBalance as bigint | undefined),
+      }),
+    [chainId, isMiniPay, usdcBalance]
+  );
 
   const { writeContractAsync, data: txHash, isPending } = useWriteContract();
   const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
@@ -132,7 +153,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "postTask",
         args: [description, location, deadline, reward],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
 
@@ -178,7 +199,7 @@ export function useTaskPayActions() {
         abi: erc20Abi,
         functionName: "approve",
         args: [taskPayAddress, rewardAmount],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       await waitForReceipt(hash);
       return hash;
@@ -209,7 +230,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "takeTask",
         args: [taskId],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
       await waitForReceipt(hash);
@@ -236,7 +257,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "submitEvidence",
         args: [taskId, evidenceUrl],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
       await waitForReceipt(hash);
@@ -263,7 +284,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "completeTask",
         args: [taskId, evidenceUrl],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
       await waitForReceipt(hash);
@@ -292,7 +313,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "approveTask",
         args: [taskId],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
       await waitForReceipt(hash);
@@ -321,7 +342,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "rejectTask",
         args: [taskId],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
       await waitForReceipt(hash);
@@ -345,7 +366,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "markTaskComplete",
         args: [taskId],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
       await waitForReceipt(hash);
@@ -370,7 +391,7 @@ export function useTaskPayActions() {
         abi: taskPayAbi,
         functionName: "cancelTask",
         args: [taskId],
-        ...feeCurrencyFor(),
+        ...txFeeCurrency,
       });
       setSimulatedTx(false);
       await waitForReceipt(hash);

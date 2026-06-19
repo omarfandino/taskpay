@@ -28,3 +28,19 @@ export function normalizeWalletAddress(address: string): `0x${string}` {
   }
   return address.toLowerCase() as `0x${string}`;
 }
+
+export function hasMiniPayNetworkFeeCoverage(
+  usdcWei: bigint | undefined
+): boolean {
+  return usdcWei !== undefined && usdcWei >= MIN_USDC_FOR_FEES;
+}
+
+/** Browser can pay network fees with native CELO or USDC (fee abstraction). */
+export function hasBrowserNetworkFeeCoverage(
+  nativeWei: bigint | undefined,
+  usdcWei: bigint | undefined
+): boolean {
+  if (nativeWei !== undefined && nativeWei >= MIN_CELO_FOR_FEES) return true;
+  if (usdcWei !== undefined && usdcWei >= MIN_USDC_FOR_FEES) return true;
+  return false;
+}
