@@ -3,12 +3,15 @@ set -euo pipefail
 
 # Deploy TaskPay to Celo Mainnet (production Demo Day)
 export PATH="$HOME/.foundry/bin:$PATH"
+# shellcheck disable=SC1091
+source "$(dirname "$0")/load-env.sh"
+load_taskpay_env
 cd "$(dirname "$0")/../apps/contracts"
 
 COPM_MAINNET=0x8a567e2ae79ca692bd748ab832081c45de4041ea
 
 if [ -z "${PRIVATE_KEY:-}" ]; then
-  echo "Error: set PRIVATE_KEY"
+  echo "Error: set PRIVATE_KEY in taskpay/.env or export it in your shell"
   exit 1
 fi
 

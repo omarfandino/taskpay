@@ -5,10 +5,13 @@ set -euo pipefail
 # Requires: PRIVATE_KEY with CELO for gas on Sepolia
 
 export PATH="$HOME/.foundry/bin:$PATH"
+# shellcheck disable=SC1091
+source "$(dirname "$0")/load-env.sh"
+load_taskpay_env
 cd "$(dirname "$0")/../apps/contracts"
 
 if [ -z "${PRIVATE_KEY:-}" ]; then
-  echo "Error: set PRIVATE_KEY (deployer with COPm on Sepolia)"
+  echo "Error: set PRIVATE_KEY in taskpay/.env or export it in your shell"
   exit 1
 fi
 
