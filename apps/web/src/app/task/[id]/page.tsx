@@ -290,10 +290,13 @@ export default function TaskDetailPage() {
       setStatusMsg("Completing task on-chain…");
       const primaryUrl = await resolvePrimaryEvidenceUrl();
       const hash = await completeTask(taskId, primaryUrl);
+      if (hash == null) {
+        throw new Error("Could not complete task.");
+      }
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
-      } else if (hash) {
+      } else {
         setSimulated(false);
         setLastTx(hash);
       }
@@ -314,15 +317,18 @@ export default function TaskDetailPage() {
     if (!taskPayAvailable) return;
     try {
       const hash = await approveTask(taskId);
+      if (hash == null) {
+        throw new Error("Approval failed.");
+      }
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
-      } else if (hash) {
+      } else {
         setSimulated(false);
         setLastTx(hash);
       }
-      refetch();
       await refreshViewsAfterTx();
+      refetch();
       router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
@@ -335,15 +341,18 @@ export default function TaskDetailPage() {
     setConfirmAction(null);
     try {
       const hash = await rejectTask(taskId);
+      if (hash == null) {
+        throw new Error("Reject failed.");
+      }
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
-      } else if (hash) {
+      } else {
         setSimulated(false);
         setLastTx(hash);
       }
-      refetch();
       await refreshViewsAfterTx();
+      refetch();
       router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
@@ -356,15 +365,18 @@ export default function TaskDetailPage() {
     setConfirmAction(null);
     try {
       const hash = await cancelTask(taskId);
+      if (hash == null) {
+        throw new Error("Cancel failed.");
+      }
       if (hash === "demo-simulated") {
         setSimulated(true);
         setLastTx(null);
-      } else if (hash) {
+      } else {
         setSimulated(false);
         setLastTx(hash);
       }
-      refetch();
       await refreshViewsAfterTx();
+      refetch();
       router.push("/my-tasks?tab=posted");
     } catch (err) {
       console.error(err);
@@ -740,7 +752,11 @@ export default function TaskDetailPage() {
               onClick={async () => {
                 setConfirmAction(null);
                 try {
-                  await rejectTask(taskId, true);
+                  const hash = await rejectTask(taskId, true);
+                  if (hash == null) {
+                    throw new Error("Reject failed.");
+                  }
+                  await refreshViewsAfterTx();
                   refetch();
                   router.push("/my-tasks?tab=posted");
                 } catch (err) {
@@ -775,7 +791,11 @@ export default function TaskDetailPage() {
             disabled={actionBusy}
             onClick={async () => {
               try {
-                await approveTask(taskId, true);
+                const hash = await approveTask(taskId, true);
+                if (hash == null) {
+                  throw new Error("Approval failed.");
+                }
+                await refreshViewsAfterTx();
                 refetch();
                 router.push("/my-tasks?tab=posted");
               } catch (err) {

@@ -112,7 +112,10 @@ export function useTaskPayActions() {
       if (!publicClient) {
         throw new Error("Network client not ready. Try again.");
       }
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status === "reverted") {
+        throw new Error("Transaction reverted.");
+      }
       await invalidateTaskReads();
     },
     [invalidateTaskReads, publicClient]

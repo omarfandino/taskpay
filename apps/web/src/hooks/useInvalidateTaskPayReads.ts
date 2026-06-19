@@ -49,7 +49,7 @@ export function useRefreshTaskPayViewsAfterTx() {
 
   return useCallback(async () => {
     await refresh();
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     await refresh();
   }, [refresh]);
 }
