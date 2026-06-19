@@ -4,10 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Plus, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWelcomeUsdc } from "@/components/WelcomeUsdcProvider";
 
 export function BottomNav() {
   const pathname = usePathname();
   const createActive = pathname === "/create";
+  const { isWalletSetupBlocking } = useWelcomeUsdc();
+
+  if (isWalletSetupBlocking) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md">

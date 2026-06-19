@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 /**
- * Swap USDC → COPm on Celo Sepolia via Mento, then send all COPm received to MiniPay.
- * Requires: PRIVATE_KEY, MINIPAY_ADDRESS in taskpay/.env
+ * Swap USDC → COPm on Celo Sepolia via Mento (deployer wallet), then send COPm to a recipient.
+ * Requires: PRIVATE_KEY in taskpay/.env; MINIPAY_ADDRESS if no recipient arg.
  *
- * Prereqs:
- * - Deployer has USDC (Circle faucet → deployer address)
- * - Deployer has CELO for gas (faucet.celo.org/celo-sepolia)
+ * Prereqs on deployer:
+ * - USDC (Circle faucet → deployer address)
+ * - CELO for gas (faucet.celo.org/celo-sepolia)
  *
- * Usage: pnpm fund:copm [usdcAmount]
- * Example: pnpm fund:copm 5
+ * Usage: pnpm fund:copm [usdcAmount] [0xRecipient]
+ * Examples:
+ *   pnpm fund:copm 5                        → 5 USDC worth of COPm to MINIPAY_ADDRESS
+ *   pnpm fund:copm 5 0x1823CF07c8F0...      → same, to taker wallet
+ *   pnpm fund:copm 0x1823CF07c8F0... 5      → order does not matter
  */
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
@@ -37,12 +40,47 @@ const ERC20_ABI = [
   "function transfer(address,uint256) returns (bool)",
 ];
 
-const usdcAmount = ethers.utils.parseUnits(process.argv[2] ?? "5", 6);
+const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+
+function parseArgs(argv) {
+  let usdcAmountHuman = "5";
+  let recipient = null;
+
+  for (const arg of argv.slice(2)) {
+    if (ADDRESS_RE.test(arg)) {
+      recipient = arg;
+    } else if (/^\d+(\.\d+)?$/.test(arg)) {
+      usdcAmountHuman = arg;
+    } else {
+      throw new Error(
+        `Unknown argument "${arg}". Usage: fund:copm [usdcAmount] [0xRecipient]`
+      );
+    }
+  }
+
+  recipient = recipient ?? env.MINIPAY_ADDRESS;
+  if (!recipient) {
+    throw new Error(
+      "Pass a 0x recipient or set MINIPAY_ADDRESS in taskpay/.env for the default."
+    );
+  }
+  if (!ADDRESS_RE.test(recipient)) {
+    throw new Error(`Invalid recipient address: ${recipient}`);
+  }
+
+  return {
+    recipient,
+    usdcAmount: ethers.utils.parseUnits(usdcAmountHuman, 6),
+    usdcAmountHuman,
+  };
+}
 
 async function main() {
-  if (!env.PRIVATE_KEY || !env.MINIPAY_ADDRESS) {
-    throw new Error("Set PRIVATE_KEY and MINIPAY_ADDRESS in taskpay/.env");
+  if (!env.PRIVATE_KEY) {
+    throw new Error("Set PRIVATE_KEY in taskpay/.env (deployer wallet).");
   }
+
+  const { recipient, usdcAmount, usdcAmountHuman } = parseArgs(process.argv);
 
   const provider = new ethers.providers.JsonRpcProvider(RPC);
   const signer = new ethers.Wallet(env.PRIVATE_KEY, provider);
@@ -51,32 +89,38 @@ async function main() {
   const mento = await Mento.create(signer);
 
   const usdcBal = await usdc.balanceOf(signer.address);
-  console.log(`Deployer ${signer.address}`);
-  console.log(`MiniPay   ${env.MINIPAY_ADDRESS}`);
-  console.log(`USDC balance: ${ethers.utils.formatUnits(usdcBal, 6)}`);
+  console.log(`From (deployer) ${signer.address}`);
+  console.log(`To (recipient)  ${recipient}`);
+  console.log(`USDC balance:    ${ethers.utils.formatUnits(usdcBal, 6)}`);
   if (usdcBal.lt(usdcAmount)) {
     throw new Error(
-      `Need at least ${ethers.utils.formatUnits(usdcAmount, 6)} USDC on deployer. Use https://faucet.circle.com/ (Celo Sepolia).`
+      `Need at least ${usdcAmountHuman} USDC on deployer. Use https://faucet.circle.com/ (Celo Sepolia).`
     );
   }
 
   const expectedOut = await mento.getAmountOut(USDC, COPm, usdcAmount);
   const amountOutMin = expectedOut.mul(99).div(100);
   console.log(
-    `Quote: ${ethers.utils.formatUnits(usdcAmount, 6)} USDC → ~${ethers.utils.formatUnits(expectedOut, 18)} COPm`
+    `Quote: ${usdcAmountHuman} USDC → ~${ethers.utils.formatUnits(expectedOut, 18)} COPm`
   );
+
+  // USDC → COPm on Sepolia is often a 2-hop route (USDC → USDm → COPm) via MentoRouter,
+  // not the Broker. Approve both before swapIn (which estimates gas during populateTransaction).
+  const spenders = [...new Set([mento.router.address, mento.broker.address])];
+  for (const spender of spenders) {
+    const allowance = await usdc.allowance(signer.address, spender);
+    if (allowance.lt(usdcAmount)) {
+      const approveTx = await usdc.approve(spender, ethers.constants.MaxUint256);
+      console.log(`Approval tx (${spender}):`, approveTx.hash);
+      await approveTx.wait();
+    }
+  }
 
   const copmBefore = await copm.balanceOf(signer.address);
 
-  const broker = await mento.getBroker();
-  const allowance = await usdc.allowance(signer.address, broker.address);
-  if (allowance.lt(usdcAmount)) {
-    const approveTx = await usdc.approve(broker.address, usdcAmount);
-    console.log("Approval tx:", approveTx.hash);
-    await approveTx.wait();
-  }
-
   const swapReq = await mento.swapIn(USDC, COPm, usdcAmount, amountOutMin);
+  console.log(`Swap via ${swapReq.to}`);
+
   const swapTx = await signer.sendTransaction(swapReq);
   console.log("Swap tx:", swapTx.hash);
   await swapTx.wait();
@@ -89,9 +133,9 @@ async function main() {
 
   console.log(`COPm received: ${ethers.utils.formatUnits(received, 18)}`);
 
-  const transferTx = await copm.transfer(env.MINIPAY_ADDRESS, received);
+  const transferTx = await copm.transfer(recipient, received);
   console.log(
-    `Sent ${ethers.utils.formatUnits(received, 18)} COPm to MiniPay`
+    `Sent ${ethers.utils.formatUnits(received, 18)} COPm to ${recipient}`
   );
   console.log("Transfer tx:", transferTx.hash);
   await transferTx.wait();

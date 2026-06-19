@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
- * Send USDC on Celo Sepolia (gas money for a wallet).
- * Requires: PRIVATE_KEY in taskpay/.env (deployer with USDC + CELO for gas)
+ * Send USDC on Celo Sepolia from deployer (network fees for a wallet).
+ * Requires: PRIVATE_KEY in taskpay/.env; MINIPAY_ADDRESS if no recipient arg.
  *
- * Usage: pnpm fund:usdc <0xRecipient> [amount]
- * Example: pnpm fund:usdc 0xAB67... 1
+ * Usage: pnpm fund:usdc [amount] [0xRecipient]
+ * Examples:
+ *   pnpm fund:usdc 1                          → 1 USDC to MINIPAY_ADDRESS
+ *   pnpm fund:usdc 1 0x1823CF07c8F0...        → 1 USDC to taker wallet
+ *   pnpm fund:usdc 0x1823CF07c8F0... 1        → order does not matter
  */
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
@@ -29,28 +32,59 @@ const ERC20_ABI = [
   "function transfer(address,uint256) returns (bool)",
 ];
 
-const recipient = process.argv[2];
-const amountHuman = process.argv[3] ?? "1";
+const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+
+function parseArgs(argv) {
+  let amountHuman = "1";
+  let recipient = null;
+
+  for (const arg of argv.slice(2)) {
+    if (ADDRESS_RE.test(arg)) {
+      recipient = arg;
+    } else if (/^\d+(\.\d+)?$/.test(arg)) {
+      amountHuman = arg;
+    } else {
+      throw new Error(
+        `Unknown argument "${arg}". Usage: fund:usdc [amount] [0xRecipient]`
+      );
+    }
+  }
+
+  recipient = recipient ?? env.MINIPAY_ADDRESS;
+  if (!recipient) {
+    throw new Error(
+      "Pass a 0x recipient or set MINIPAY_ADDRESS in taskpay/.env for the default."
+    );
+  }
+  if (!ADDRESS_RE.test(recipient)) {
+    throw new Error(`Invalid recipient address: ${recipient}`);
+  }
+
+  return {
+    recipient,
+    amount: ethers.utils.parseUnits(amountHuman, 6),
+    amountHuman,
+  };
+}
 
 async function main() {
   if (!env.PRIVATE_KEY) {
-    throw new Error("Set PRIVATE_KEY in taskpay/.env");
+    throw new Error("Set PRIVATE_KEY in taskpay/.env (deployer wallet).");
   }
-  if (!recipient || !/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
-    throw new Error("Usage: fund:usdc <0xRecipient> [amountUSDC]");
-  }
+
+  const { recipient, amount, amountHuman } = parseArgs(process.argv);
 
   const provider = new ethers.providers.JsonRpcProvider(RPC);
   const signer = new ethers.Wallet(env.PRIVATE_KEY, provider);
   const usdc = new ethers.Contract(USDC, ERC20_ABI, signer);
-  const amount = ethers.utils.parseUnits(amountHuman, 6);
 
   const bal = await usdc.balanceOf(signer.address);
-  console.log(`Deployer ${signer.address}`);
-  console.log(`USDC balance: ${ethers.utils.formatUnits(bal, 6)}`);
+  console.log(`From (deployer) ${signer.address}`);
+  console.log(`To (recipient)  ${recipient}`);
+  console.log(`USDC balance:    ${ethers.utils.formatUnits(bal, 6)}`);
   if (bal.lt(amount)) {
     throw new Error(
-      "Insufficient USDC on deployer. Fund via https://faucet.circle.com/ (Celo Sepolia)."
+      `Need at least ${amountHuman} USDC on deployer. Fund via https://faucet.circle.com/ (Celo Sepolia).`
     );
   }
 

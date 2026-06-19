@@ -8,6 +8,8 @@ import { HeaderBalance } from "@/components/HeaderBalance";
 import { BottomNav } from "@/components/BottomNav";
 import { MiniPayBanner } from "@/components/MiniPayGuard";
 import { WelcomeUsdcBanner } from "@/components/WelcomeUsdcBanner";
+import { WelcomeUsdcProvider } from "@/components/WelcomeUsdcProvider";
+import { WelcomeReadyGate } from "@/components/WelcomeReadyGate";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -34,14 +36,18 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${outfit.variable} ${inter.variable} font-body`}>
         <WalletProvider>
-          <div className="relative flex min-h-screen flex-col">
-            <MiniPayBanner />
-            <WelcomeUsdcBanner />
-            <DemoStorageBanner />
-            <HeaderBalance />
-            <main className="flex-1">{children}</main>
-            <BottomNav />
-          </div>
+          <WelcomeUsdcProvider>
+            <div className="relative flex min-h-screen flex-col">
+              <MiniPayBanner />
+              <WelcomeUsdcBanner />
+              <DemoStorageBanner />
+              <HeaderBalance />
+              <WelcomeReadyGate>
+                <main className="flex-1">{children}</main>
+              </WelcomeReadyGate>
+              <BottomNav />
+            </div>
+          </WelcomeUsdcProvider>
         </WalletProvider>
       </body>
     </html>
