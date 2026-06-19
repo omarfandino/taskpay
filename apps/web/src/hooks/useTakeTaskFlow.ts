@@ -46,7 +46,7 @@ export function useTakeTaskFlow(options?: {
         }
         onTakenRef.current?.(taskId);
         await refreshViewsAfterTx();
-        router.push("/my-tasks?tab=taken");
+        router.push(`/task/${taskId.toString()}`);
       } catch (err) {
         console.error(err);
         if (isTaskNotOpenError(err)) {
