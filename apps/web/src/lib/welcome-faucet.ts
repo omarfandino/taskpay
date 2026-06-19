@@ -4,6 +4,9 @@ import { CHAIN_IDS, TOKEN_ADDRESSES } from "./constants";
 /** One-time welcome transfer for new wallets (network fees). */
 export const WELCOME_USDC_AMOUNT = parseUnits("1", 6);
 
+/** Warn when below this — one takeTask fee is ~0.01 USDC on Sepolia. */
+export const MIN_USDC_FOR_FEES = parseUnits("0.05", 6);
+
 export const CELO_SEPOLIA_RPC =
   "https://forno.celo-sepolia.celo-testnet.org";
 

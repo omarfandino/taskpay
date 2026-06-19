@@ -6,6 +6,7 @@ import { getCopmAddress, getUsdcAddress } from "@/lib/tx";
 import { useMiniPay } from "@/hooks/useMiniPay";
 import { DEMO_STORAGE_MODE } from "@/lib/demo-config";
 import { MINIPAY_DEPOSIT_URL } from "@/lib/constants";
+import { MIN_USDC_FOR_FEES } from "@/lib/welcome-faucet";
 
 export function MiniPayBanner() {
   const { mounted, isMiniPay } = useMiniPay();
@@ -62,7 +63,9 @@ export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
     copmBal !== undefined &&
     (copmBal as bigint) === 0n;
   const lowUsdc =
-    usdcBal !== undefined && (usdcBal as bigint) < 10n ** 6n;
+    usdcBal !== undefined && (usdcBal as bigint) < MIN_USDC_FOR_FEES;
+  const noUsdc =
+    usdcBal !== undefined && (usdcBal as bigint) === 0n;
 
   if (!lowCopm && !lowUsdc) return null;
 
@@ -91,9 +94,22 @@ export function LowBalanceNotice({ mode = "post" }: LowBalanceNoticeProps) {
       )}
       {lowUsdc && (
         <p className={lowCopm ? "mt-2" : undefined}>
-          Keep some <strong>USDC</strong> for network fees.
-          {mode === "browse" && !lowCopm && (
-            <> New wallets get 1 USDC automatically — wait a few seconds after connecting.</>
+          {noUsdc ? (
+            <>
+              Keep some <strong>USDC</strong> for network fees.
+              {mode === "browse" && !lowCopm && (
+                <>
+                  {" "}
+                  New wallets get 1 USDC automatically — wait a few seconds
+                  after connecting.
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              Running low on <strong>USDC</strong> for network fees (~0.01 per
+              action). Top up soon.
+            </>
           )}{" "}
           {isMiniPay && (
             <>
